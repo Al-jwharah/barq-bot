@@ -43,7 +43,7 @@ export function classifyIntent(input: {
   if (input.urls.length > 0) return "download";
   if (input.hasFile) return "upload";
   if ([...START].some((s) => n === s.toLowerCase() || n.startsWith("/start"))) return "start";
-  if (n.startsWith("/ai") || AI.has(n)) return "ai";
+  if (n.startsWith("/ai") || n.startsWith("/grok") || AI.has(n)) return "ai";
   if (n.startsWith("/live") || LIVE.has(n)) return "live";
   if (n.startsWith("/account") || n.startsWith("/history") || ACCOUNT.has(n)) return "account";
   if (n.startsWith("/points") || POINTS.has(n)) return "points";

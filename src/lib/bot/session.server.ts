@@ -100,6 +100,8 @@ export type LastClip = {
   mediaUrl?: string;
   thumbnail?: string;
   kind?: string;
+  /** Seconds, when known from extract (used by Smart Clips / subtitles). */
+  duration?: number;
 };
 
 function lastClipMap(): Map<number, LastClip> {
