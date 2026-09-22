@@ -51,7 +51,7 @@ export function isTgFileStorageKey(key: string | null | undefined): boolean {
 export function tgFileIdFromStorageKey(key: string): string | null {
   if (!isTgFileStorageKey(key)) return null;
   const id = key.slice(TGFILE_PREFIX.length);
-  if (!id || id.includes("/") || id.includes("..") || id.includes("\\")) return null;
+  if (!id || id.includes("/") || id.includes("..")) return null;
   return id;
 }
 
