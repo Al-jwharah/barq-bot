@@ -2574,6 +2574,7 @@ export async function handleUpdate(update: TgUpdate) {
     await markTelegramUpdateProcessed(update.update_id);
   } catch (err) {
     markError(err instanceof Error ? err.message : "update failed");
+    await import("./sentry.server").then((m) => m.captureError(err, "handleUpdate")).catch(() => undefined);
     await markTelegramUpdateFailed(
       update.update_id,
       err instanceof Error ? err.message : "update failed",

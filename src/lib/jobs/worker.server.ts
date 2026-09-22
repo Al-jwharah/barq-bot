@@ -267,6 +267,9 @@ export async function processDownloadJob(id?: string): Promise<{ id?: string; st
     const shown = userFailMessage(technical);
     const next = await retryOrFail(job, technical);
     markError(technical);
+    if (next === "failed") {
+      await import("../bot/sentry.server").then((m) => m.captureError(err, "processDownloadJob")).catch(() => undefined);
+    }
     await logDownload({ tgId: fromId, url: job.url, ok: false, reason: technical.slice(0, 180) }).catch(() => undefined);
     if (next === "failed") {
       const { isRetryableError } = await import("./retry-policy");

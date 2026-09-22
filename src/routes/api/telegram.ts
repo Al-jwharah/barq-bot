@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { flushDb } from "@/lib/db";
 import { handleUpdate } from "@/lib/bot/handle.server";
 import { guardTelegramRequest } from "@/lib/bot/webhook-guard";
+import { initSentry } from "@/lib/bot/sentry.server";
 
 function later(task: Promise<unknown>): Promise<unknown> {
   try {
@@ -32,6 +33,7 @@ export const Route = createFileRoute("/api/telegram")({
       DELETE: methodNotAllowed,
       OPTIONS: methodNotAllowed,
       POST: async ({ request }) => {
+        initSentry();
         const raw = await request.text();
         const guarded = guardTelegramRequest(request, raw);
         if (!guarded.ok) {

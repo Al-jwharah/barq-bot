@@ -4,6 +4,14 @@ import { LAUNCH_MAX, MAINTENANCE, OWNER_TG_ID, SUBSCRIPTIONS_LIVE, TEMP_FREE } f
 import { jobStats, type JobCounts } from "../jobs/queue.server";
 import { telegram } from "./telegram.server";
 import { getSettings, setSetting } from "./store.server";
+import {
+  failRateAlertThreshold,
+  processedFromJobCounts,
+  shouldAlertHourlyFailRate,
+} from "./ops-metrics";
+
+export { failRateAlertThreshold, processedFromJobCounts, shouldAlertHourlyFailRate };
+
 
 function emptyQueue(): JobCounts {
   return {
@@ -18,6 +26,24 @@ function emptyQueue(): JobCounts {
     failedToday: 0,
     oldestProcessingSeconds: 0,
   };
+}
+
+export async function hourlyJobFailStats(): Promise<{ failed: number; finished: number; rate: number }> {
+  const { getSql } = await import("@/lib/db");
+  const sql = await getSql();
+  const rows = await sql<{ failed: number; finished: number }>`
+    select
+      count(*) filter (where status = 'failed')::int as failed,
+      count(*) filter (
+        where status in ('completed', 'failed', 'expired', 'cancelled')
+      )::int as finished
+    from download_jobs
+    where coalesce(failed_at, completed_at, cancelled_at, expired_at, finished_at, created_at)
+      >= now() - interval '1 hour'
+  `.catch(() => [{ failed: 0, finished: 0 }]);
+  const failed = Number(rows[0]?.failed ?? 0);
+  const finished = Number(rows[0]?.finished ?? 0);
+  return { failed, finished, rate: finished > 0 ? failed / finished : 0 };
 }
 
 export async function storageStats() {
@@ -94,6 +120,22 @@ export async function runOpsAlerts() {
     alerts.push(`عامل متوقف: مهمة جارية منذ ${Math.round(q.oldestProcessingSeconds / 60)} د`);
   }
   if (q.failedToday >= 3) alerts.push(`أخطاء اليوم: ${q.failedToday} وظيفة فاشلة`);
+
+  const threshold = failRateAlertThreshold();
+  const hourly = await hourlyJobFailStats().catch(() => ({ failed: 0, finished: 0, rate: 0 }));
+  if (
+    shouldAlertHourlyFailRate({
+      failed: hourly.failed,
+      finished: hourly.finished,
+      threshold,
+    })
+  ) {
+    const pct = Math.round(hourly.rate * 100);
+    alerts.push(
+      `معدل فشل الساعة: ${pct}% (${hourly.failed}/${hourly.finished}) ≥ ${Math.round(threshold * 100)}%`,
+    );
+  }
+
   if (!alerts.length) return { sent: false, alerts: [] as string[] };
   const last = (await getSettings())["ops_alert_at"];
   const now = Date.now();
