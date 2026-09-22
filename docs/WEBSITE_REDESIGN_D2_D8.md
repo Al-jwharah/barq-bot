@@ -49,3 +49,15 @@ npx tsx --test src/lib/media/preview.test.ts \
 - No DROP/TRUNCATE
 - Did not push `main`
 - Did not `vercel --prod`
+
+## Preview URL
+
+https://barq-qp2sygqr5-abdulrhmaan999-4640s-projects.vercel.app
+
+Deployed: 2026-09-22 ~18:47 Asia/Riyadh · Vercel project `barq-vid` · **not** production.
+
+## Preview URL
+
+https://barq-qp2sygqr5-abdulrhmaan999-4640s-projects.vercel.app
+
+Deployed: 2026-09-22 ~18:47 Asia/Riyadh · Vercel project `barq-vid` · **preview only** (CLI suggested `--prod` as next step; we did **not** promote).
