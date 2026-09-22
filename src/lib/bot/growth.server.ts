@@ -339,6 +339,22 @@ export async function bumpDownloadOk(tgId: number | string, chatId?: number) {
   await track(tgId, "download_ok");
   const stats = await getGrowth(tgId);
   await unlockDue(stats, tgId, chatId);
+  if (chatId) {
+    await warnDailyLimitIfNeeded(chatId, tgId).catch(() => undefined);
+  }
+}
+
+/** B5: proactive warning at daily download #4 of 5. */
+export async function warnDailyLimitIfNeeded(chatId: number, tgId: number | string) {
+  const { DAILY_CAP, DAILY_CAP_ON } = await import("./config.server");
+  if (!DAILY_CAP_ON) return false;
+  const { todayDownloads } = await import("./store.server");
+  const { shouldWarnDailyLimit, dailyLimitWarningText } = await import("./engagement");
+  const used = await todayDownloads(tgId);
+  if (!shouldWarnDailyLimit(used, DAILY_CAP)) return false;
+  await telegram.sendMessage(chatId, dailyLimitWarningText(used, DAILY_CAP)).catch(() => undefined);
+  await track(tgId, "daily_limit_warn", String(used));
+  return true;
 }
 
 export async function bumpAi(tgId: number | string, chatId: number) {
@@ -415,16 +431,23 @@ function journeyMarkup(id: string, step: number, last: number) {
 
 export async function sendJourneyList(chatId: number, tgId: number | string) {
   const done = new Set(await completedJourneys(tgId).catch(() => [] as string[]));
+  const stats = await getGrowth(tgId).catch(() => null);
+  const { journeyStreakLine } = await import("./engagement");
+  const streakLine = journeyStreakLine(stats?.streak ?? 0, stats?.best_streak ?? 0);
   const lines = Object.entries(JOURNEYS)
     .map(([id, j]) => `${done.has(id) ? "✅" : "▫️"} ${j.title}`)
     .join("\n");
-  await telegram.sendMessage(chatId, `رحلات برق التعليمية\n\n${lines}\n\nاختر رحلة قصيرة (٣ دروس).`, {
-    reply_markup: inlineKeyboard([
-      [{ text: "رحلة البداية", callback_data: "gx:j:start:0" }],
-      [{ text: "رحلة الأمان", callback_data: "gx:j:safe:0" }],
-      [{ text: "رحلة Barq AI", callback_data: "gx:j:ai:0" }],
-    ]),
-  });
+  await telegram.sendMessage(
+    chatId,
+    `رحلتك ⚡️\n${streakLine}\n\nرحلات برق التعليمية\n\n${lines}\n\nاختر رحلة قصيرة (٣ دروس).`,
+    {
+      reply_markup: inlineKeyboard([
+        [{ text: "رحلة البداية", callback_data: "gx:j:start:0" }],
+        [{ text: "رحلة الأمان", callback_data: "gx:j:safe:0" }],
+        [{ text: "رحلة Barq AI", callback_data: "gx:j:ai:0" }],
+      ]),
+    },
+  );
 }
 
 export async function sendJourneyStep(chatId: number, tgId: number | string, id: string, step: number) {

@@ -1702,13 +1702,27 @@ async function enqueueMessageUrls(
 ) {
   const { batch, total } = selectDownloadUrls(urls);
   if (!batch.length) return;
-  const status = multiLinkStatusText(total);
-  if (status) {
-    await telegram.sendMessage(chatId, status).catch(() => undefined);
+  const { multiLinkProgressText } = await import("./engagement");
+  let statusMsgId: number | undefined;
+  if (total > 1) {
+    const first = multiLinkProgressText({ total, active: 0, done: 0 });
+    const sent = await telegram.sendMessage(chatId, first).catch(() => null);
+    statusMsgId = sent?.message_id;
+  } else {
+    const status = multiLinkStatusText(total);
+    if (status) await telegram.sendMessage(chatId, status).catch(() => undefined);
   }
   for (let i = 0; i < batch.length; i++) {
+    if (statusMsgId && total > 1) {
+      const card = multiLinkProgressText({ total, active: i, done: i });
+      await telegram.editMessageText(chatId, statusMsgId, card).catch(() => undefined);
+    }
     // update_id claim is once-per-update; only the first job may carry it.
     await handleDownload(chatId, fromId, batch[i]!, member, i === 0 ? updateId : undefined);
+  }
+  if (statusMsgId && total > 1) {
+    const done = multiLinkProgressText({ total, active: batch.length - 1, done: batch.length });
+    await telegram.editMessageText(chatId, statusMsgId, done).catch(() => undefined);
   }
 }
 
@@ -1959,10 +1973,13 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   void touchSession(fromId).catch(() => null);
   const growthText =
     text === "رحلتي" ||
+    text === "رحلتك" ||
     text === "إنجازاتي" ||
     text === "حالة برق" ||
     text === "أعجبني" ||
     text === "المعجبون" ||
+    text === "سجلي" ||
+    text === "مكتبتي" ||
     text.startsWith("/start") ||
     text === "/status" ||
     text.startsWith("/ops") ||
@@ -2340,6 +2357,12 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       return;
     }
     if (/^ref/i.test(arg)) {
+      const { REFERRALS_LIVE } = await import("./config.server");
+      const { referralsGatedMessage } = await import("./engagement");
+      if (!REFERRALS_LIVE) {
+        await telegram.sendMessage(chatId, referralsGatedMessage());
+        return;
+      }
       const { applyReferral, ensureReferral } = await import("./product.server");
       const ok = await applyReferral(fromId, arg);
       const me = await ensureReferral(fromId);
@@ -2357,10 +2380,13 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     }
     return;
   }
-  if (text === "رحلتي" || text.startsWith("/journey")) {
-    const g = await import("./growth.server");
-    await g.sendJourneyList(chatId, fromId);
-    return;
+  {
+    const { isJourneyCommand } = await import("./engagement");
+    if (isJourneyCommand(text)) {
+      const g = await import("./growth.server");
+      await g.sendJourneyList(chatId, fromId);
+      return;
+    }
   }
   if (text === "إنجازاتي" || text.startsWith("/ach")) {
     const g = await import("./growth.server");
@@ -2408,6 +2434,12 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
   if (text === "دعوة" || text.startsWith("/invite") || text === "إحالة") {
+    const { REFERRALS_LIVE } = await import("./config.server");
+    const { referralsGatedMessage } = await import("./engagement");
+    if (!REFERRALS_LIVE) {
+      await telegram.sendMessage(chatId, referralsGatedMessage(), { reply_markup: await keysFor(fromId, member) });
+      return;
+    }
     const { ensureReferral } = await import("./product.server");
     const me = await ensureReferral(fromId);
     await telegram.sendMessage(
@@ -2430,10 +2462,14 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await handleAccount(chatId, fromId);
     return;
   }
-  if (text === "سجلي" || text === "سجليّ" || text.startsWith("/history") || text === "سجل التحميل") {
-    const { listHistory } = await import("./library.server");
-    await sendHistoryList(chatId, fromId, await listHistory(fromId, 20), "آخر 20 تحميل");
-    return;
+  {
+    const { isLibraryCommand } = await import("./engagement");
+    if (isLibraryCommand(text)) {
+      const { listHistory } = await import("./library.server");
+      const rows = await listHistory(fromId, 25);
+      await sendHistoryList(chatId, fromId, rows, `مكتبتي · آخر ${rows.length || 25} تحميل`);
+      return;
+    }
   }
   if (text === "حدّي" || text === "حدي" || text.startsWith("/quota") || text === "حد التحميل") {
     await sendMonthlyCard(chatId, fromId, member);
@@ -2449,6 +2485,12 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
   if (text === "ادعُ صديق" || text === "ادع صديق" || text.startsWith("/ref") || text === "إحالة") {
+    const { REFERRALS_LIVE } = await import("./config.server");
+    const { referralsGatedMessage } = await import("./engagement");
+    if (!REFERRALS_LIVE) {
+      await telegram.sendMessage(chatId, referralsGatedMessage());
+      return;
+    }
     const { ensureReferral } = await import("./product.server");
     const me = await ensureReferral(fromId);
     await telegram.sendMessage(
@@ -2468,10 +2510,14 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await telegram.sendMessage(chatId, "تجربة بلس 7 أيام اشتغلت. بدون بطاقة.");
     return;
   }
-  if (text === "موصى به" || text.startsWith("/top")) {
-    const { analyticsReport } = await import("./product.server");
-    await telegram.sendMessage(chatId, `أعلى التحميلات هذا الأسبوع:\n${await analyticsReport()}`);
-    return;
+  {
+    const { isLeaderboardCommand } = await import("./engagement");
+    if (isLeaderboardCommand(text)) {
+      const { leaderboardPayload } = await import("./leaderboard.server");
+      const payload = await leaderboardPayload(10);
+      await telegram.sendMessage(chatId, payload.message);
+      return;
+    }
   }
   if (text === "بحث في السجل" || text.startsWith("/find")) {
     awaitMap().set(fromId, "lib_search");
