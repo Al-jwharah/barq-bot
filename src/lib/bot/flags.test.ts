@@ -27,6 +27,8 @@ import {
   SUBSCRIPTIONS_LIVE,
   REFERRALS_LIVE,
   LEADERBOARD_LIVE,
+  ADS_ENABLED,
+  SUBSCRIPTIONS_UI,
   VIP_STARS,
   MAX_STARS,
   VAULT_ARCHIVE_ENABLED,
@@ -101,6 +103,12 @@ test("DAILY_CAP_ON default is true, TEMP_FREE default true, WATERMARK false", ()
 test("engagement live flags stay OFF until Squad C 48h window", () => {
   assert.equal(REFERRALS_LIVE, false);
   assert.equal(LEADERBOARD_LIVE, false);
+  assert.equal(SUBSCRIPTIONS_LIVE, false);
+});
+
+test("website product v2 flags: ads off, subscriptions UI on, live payments off", () => {
+  assert.equal(ADS_ENABLED, false);
+  assert.equal(SUBSCRIPTIONS_UI, true);
   assert.equal(SUBSCRIPTIONS_LIVE, false);
 });
 

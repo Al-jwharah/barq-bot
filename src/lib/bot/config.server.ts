@@ -8,6 +8,8 @@ export const KNOWN_BOOLEAN_FLAGS = [
   "BARQ_REFERRALS_LIVE",
   "BARQ_LEADERBOARD_LIVE",
   "BARQ_TELEGRAM_LOGIN_ENABLED",
+  "BARQ_ADS_ENABLED",
+  "BARQ_SUBSCRIPTIONS_UI",
   "BARQ_DAILY_CAP_ON",
   "BARQ_MAINTENANCE",
   "BARQ_VAULT_ARCHIVE_ENABLED",
@@ -74,6 +76,10 @@ export const REFERRALS_LIVE = envFlag("BARQ_REFERRALS_LIVE", false);
 export const LEADERBOARD_LIVE = envFlag("BARQ_LEADERBOARD_LIVE", false);
 /** Telegram Login Widget for /library. Default OFF — needs BotFather domain + owner config. */
 export const TELEGRAM_LOGIN_ENABLED = envFlag("BARQ_TELEGRAM_LOGIN_ENABLED", false);
+/** Tasteful site ad slots. Default OFF — demo creatives stay clearly labeled when off. */
+export const ADS_ENABLED = envFlag("BARQ_ADS_ENABLED", false);
+/** Website pricing UI / Telegram deep-links. Separate from BARQ_SUBSCRIPTIONS_LIVE payments. */
+export const SUBSCRIPTIONS_UI = envFlag("BARQ_SUBSCRIPTIONS_UI", true);
 export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 5) || 5;
 export const DAILY_CAP_ON = envFlag("BARQ_DAILY_CAP_ON", true);
 export const MAINTENANCE = envFlag("BARQ_MAINTENANCE", false);
@@ -150,9 +156,9 @@ export const GROK_SPEEDS = ["fast", "balanced", "thorough"] as const;
 export type GrokSpeed = (typeof GROK_SPEEDS)[number];
 
 export const GROK_MODEL_META: Record<GrokModel, { label: string; hint: string }> = {
-  "grok-4.5": { label: "Grok 4.5", hint: "الأحدث والأقوى" },
-  "grok-4": { label: "Grok 4", hint: "متوازن" },
-  "grok-3": { label: "Grok 3", hint: "خفيف وسريع" },
+  "grok-4.5": { label: "برق AI 4.5", hint: "الأحدث والأقوى" },
+  "grok-4": { label: "برق AI 4", hint: "متوازن" },
+  "grok-3": { label: "برق AI 3", hint: "خفيف وسريع" },
 };
 
 export function grokModelLabel(model: string): string {

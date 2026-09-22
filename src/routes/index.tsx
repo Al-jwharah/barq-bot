@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowUpLeft,
   Download,
+  Library,
   Link2,
   Loader2,
+  Map,
   ShieldCheck,
   Sparkles,
   Zap,
@@ -13,10 +15,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getStatus, resolveMedia } from "@/lib/media/functions";
-import type { ExtractResult, MediaItem } from "@/lib/media/types";
+import type { ExtractResult } from "@/lib/media/types";
 import {
-  formatBytes,
-  formatDuration,
   platformLabelAr,
   toLinkPreview,
   type LinkPreview,
@@ -24,6 +24,7 @@ import {
 import type { BotState } from "@/lib/bot/state";
 import { cn } from "@/lib/utils";
 import { SiteFooter, SiteNav } from "@/components/site/site-nav";
+import { AdSlot } from "@/components/site/ad-slot";
 
 export const Route = createFileRoute("/")({
   loader: () =>
@@ -39,11 +40,11 @@ export const Route = createFileRoute("/")({
     }) satisfies BotState,
   head: () => ({
     meta: [
-      { title: "برق ⚡️ حمّل أي فيديو — تيك توك · يوتيوب · إنستغرام" },
+      { title: "برق ⚡️ منصة التحميل والذكاء — تيك توك · يوتيوب · إنستغرام" },
       {
         name: "description",
         content:
-          "برق منتج عربي مموّل لتحميل الفيديو. معاينة حية قبل البوت، Barq AI، ومكتبة تليجرام. مجاني — كوب قهوة إن أحببت.",
+          "برق منصة عربية: تحميل فيديو، برق AI، مكتبة تليجرام، وخارطة طريق. معاينة حية قبل البوت.",
       },
     ],
   }),
@@ -52,10 +53,29 @@ export const Route = createFileRoute("/")({
 
 type Hist = { url: string; title: string; platform: string; at: number };
 const HK = "barq-history";
-const FEATURES = [
-  { title: "معاينة حية", body: "صورة ومدة وحجم تقديري قبل الإرسال للبوت." },
-  { title: "Barq AI", body: "اسأل عن الرابط: لخّص، اشرح، اقترح عنوانًا." },
-  { title: "مجاني + قهوة", body: "التحميل مجاني. ادعم من 10 إلى 250 نجمة أو USDT." },
+
+const PLATFORM_PILLARS = [
+  {
+    title: "تحميل فوري",
+    body: "تيك توك ويوتيوب وإنستغرام وإكس — معاينة ثم ملف نظيف على تليجرام.",
+    icon: Download,
+  },
+  {
+    title: "برق AI",
+    body: "لخّص، اشرح، واقترح عناوين — من الموقع أو داخل البوت.",
+    icon: Sparkles,
+  },
+  {
+    title: "مكتبتي",
+    body: "سجل تحميلاتك خلف تسجيل الدخول — جاهز عندما يفعّل المالك الودجت.",
+    icon: Library,
+  },
+] as const;
+
+const ROADMAP = [
+  { t: "الآن", d: "معاينة حية · بوت التحميل · ملعب برق AI" },
+  { t: "قريبًا", d: "مكتبة بحساب تليجرام · اشتراكات Stars من الموقع" },
+  { t: "لاحقًا", d: "دفعات جماعية · رعاة · لوحات نمو أوسع" },
 ] as const;
 
 function readHist(): Hist[] {
@@ -71,16 +91,6 @@ function readHist(): Hist[] {
 
 function writeHist(rows: Hist[]) {
   localStorage.setItem(HK, JSON.stringify(rows.slice(0, 8)));
-}
-
-function fileUrl(u: string) {
-  try {
-    const h = new URL(u).hostname.toLowerCase();
-    if (h.includes("blob.vercel") || h === "localhost" || h.endsWith(".local")) return "#";
-    return u;
-  } catch {
-    return "#";
-  }
 }
 
 function HomePage() {
@@ -116,7 +126,7 @@ function HomePage() {
       })
       .catch(() => {
         setAiReady(false);
-        setAiReason("تعذر التحقق من Barq AI");
+        setAiReason("تعذر التحقق من برق AI");
       });
     return () => clearInterval(t);
   }, []);
@@ -175,7 +185,7 @@ function HomePage() {
 
   async function askAi() {
     if (aiReady === false) {
-      toast.error(aiReason || "Barq AI غير جاهز");
+      toast.error(aiReason || "برق AI غير جاهز");
       return;
     }
     const target = url.trim();
@@ -203,7 +213,7 @@ function HomePage() {
       }
       setAiAnswer(json.answer || "");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "فشل Barq AI");
+      toast.error(err instanceof Error ? err.message : "فشل برق AI");
     } finally {
       setAiBusy(false);
     }
@@ -220,7 +230,7 @@ function HomePage() {
           <div className="w-full max-w-sm rounded-3xl bg-surface p-6 shadow-[var(--shadow-card)]">
             <p className="text-xs text-muted">تجربة أول استخدام {tour + 1}/3</p>
             <h2 className="mt-2 font-display text-xl font-semibold">
-              {["الصق الرابط", "معاينة قبل البوت", "Barq AI"][tour]}
+              {["الصق الرابط", "معاينة قبل البوت", "برق AI"][tour]}
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted">
               {
@@ -265,23 +275,26 @@ function HomePage() {
         </div>
       ) : null}
 
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex items-center justify-between gap-3">
         <div className="inline-flex h-11 items-center gap-2 rounded-full bg-surface px-3 shadow-[var(--shadow-border)]">
           <img src="/logo.jpg" alt="" className="bolt-glow size-7 rounded-full object-cover" />
           <span className="font-display text-sm font-semibold tracking-tight">برق ⚡️</span>
+          <span
+            className={cn("ms-1 size-1.5 rounded-full", live ? "bg-live" : "bg-subtle")}
+            title={live ? "جاهز" : "يتهيأ"}
+          />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3 text-xs text-muted shadow-[var(--shadow-border)]">
-            <span className={cn("size-1.5 rounded-full", live ? "bg-live" : "bg-subtle")} />
-            {live ? "جاهز" : "يتهيأ"}
-          </div>
-          <SiteNav active="/" />
-        </div>
+        <SiteNav active="/" />
       </header>
 
-      <section className="card-enter mt-6 overflow-hidden rounded-[2rem] bg-surface shadow-[var(--shadow-card)]">
-        <div className="grid md:grid-cols-[1.1fr_0.9fr]">
-          <div className="relative aspect-[9/14] max-h-[26rem] bg-surface-2 md:aspect-auto md:min-h-[22rem]">
+      {/* Hero: full-width media — no aspect+max-h shrink (RTL left gutter bug) */}
+      <section className="card-enter mt-6 w-full overflow-hidden rounded-[2rem] bg-surface shadow-[var(--shadow-card)]">
+        <div className="relative w-full overflow-hidden bg-black">
+          {/*
+            promo.mp4 is 720×1280 (9:16). Use full width + fixed height band with object-cover
+            so the box never shrinks narrower than the card (which caused the black left gutter in RTL).
+          */}
+          <div className="relative h-[min(72vw,26rem)] w-full sm:h-[22rem]">
             <video
               src="/promo.mp4"
               poster="/start-hero.jpg"
@@ -289,50 +302,59 @@ function HomePage() {
               muted
               loop
               playsInline
-              className="absolute inset-0 size-full object-cover"
+              className="absolute inset-0 size-full object-cover object-center"
             />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-bg/95 via-bg/55 to-transparent px-5 pb-5 pt-20">
+            <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/50 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 px-5 pb-5 pt-16 sm:px-7 sm:pb-7">
               <p className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-medium text-accent">
-                <Zap className="size-3" /> منتج عربي مموّل
+                <Zap className="size-3" /> منصة عربية مموّلة
               </p>
               <h1 className="mt-3 font-display text-3xl font-semibold leading-snug tracking-tight sm:text-4xl">
-                حمّل أي فيديو
-                <span className="text-accent"> بضربة برق</span>
+                منصة برق
+                <span className="text-accent"> للتحميل والذكاء</span>
               </h1>
-              <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
-                معاينة حية على الموقع، ثم أرسل للبوت. Barq AI يفهمك. مجاني — كوب قهوة إن أحببت.
+              <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">
+                تحميل · برق AI · مكتبة · خارطة طريق — مو بس «الصق رابط».
               </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a
+                  href={botHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-action px-5 text-sm font-medium text-action-fg hover:opacity-90"
+                >
+                  ابدأ من تليجرام
+                </a>
+                <Link
+                  to="/pricing"
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-surface/90 px-5 text-sm font-medium text-fg shadow-[var(--shadow-border)]"
+                >
+                  خطط الاشتراك
+                </Link>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col justify-between gap-4 border-t border-border p-5 md:border-s md:border-t-0 md:p-6">
-            <div>
-              <h2 className="font-display text-lg font-semibold">تجربة الموقع</h2>
-              <p className="mt-1 text-sm text-muted">معاينة ← تليجرام ← ملف نظيف</p>
-              <video
-                src="/gifs/barq-bolt.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="mt-4 aspect-video w-full rounded-2xl object-cover outline outline-1 -outline-offset-1 outline-fg/10"
-              />
-            </div>
-            <a
-              href={botHref}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-12 w-full items-center justify-center rounded-full bg-action text-base font-medium text-action-fg hover:opacity-90 active:scale-[0.98]"
-            >
-              ابدأ من تليجرام
-            </a>
+        </div>
+        <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5">
+          <div>
+            <h2 className="font-display text-base font-semibold">تجربة الموقع</h2>
+            <p className="mt-0.5 text-sm text-muted">معاينة ← تليجرام ← ملف نظيف</p>
           </div>
+          <video
+            src="/gifs/barq-bolt.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="aspect-square w-full max-w-[7.5rem] justify-self-end rounded-2xl object-cover outline outline-1 -outline-offset-1 outline-fg/10 sm:max-w-[8.5rem]"
+          />
         </div>
       </section>
 
       <section className="mt-6 grid gap-2 sm:grid-cols-3">
-        {FEATURES.map((f) => (
+        {PLATFORM_PILLARS.map((f) => (
           <article key={f.title} className="flex gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-[var(--shadow-border)]">
-            <Zap className="mt-0.5 size-4 shrink-0 text-accent" />
+            <f.icon className="mt-0.5 size-4 shrink-0 text-accent" />
             <div>
               <h2 className="text-sm font-medium">{f.title}</h2>
               <p className="mt-1 text-sm leading-relaxed text-muted">{f.body}</p>
@@ -340,6 +362,25 @@ function HomePage() {
           </article>
         ))}
       </section>
+
+      <section className="mt-6 rounded-[1.75rem] bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
+        <div className="flex items-center gap-2">
+          <Map className="size-4 text-accent" />
+          <h2 className="font-display text-lg font-semibold">خارطة الطريق</h2>
+        </div>
+        <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+          {ROADMAP.map((r) => (
+            <li key={r.t} className="rounded-2xl bg-bg px-3 py-3">
+              <div className="text-xs font-medium text-accent">{r.t}</div>
+              <p className="mt-1 text-sm leading-relaxed text-muted">{r.d}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div className="mt-6">
+        <AdSlot placement="home" />
+      </div>
 
       <section className="mt-8 rounded-[1.75rem] bg-surface p-5 shadow-[var(--shadow-card)] sm:p-6">
         <div className="flex items-center gap-2">
@@ -437,23 +478,23 @@ function HomePage() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-accent" />
-            <h2 className="font-display text-lg font-semibold">ملعب Barq AI</h2>
+            <h2 className="font-display text-lg font-semibold">ملعب برق AI</h2>
           </div>
           <span className={cn("rounded-full px-2.5 py-1 text-[11px]", aiReady ? "bg-live/15 text-live" : "bg-subtle/20 text-muted")}>
-            {aiReady == null ? "…" : aiReady ? "مفتاح xAI جاهز" : "متوقف"}
+            {aiReady == null ? "…" : aiReady ? "جاهز" : "متوقف"}
           </span>
         </div>
-        <p className="mt-1 text-sm text-muted">رد حقيقي إن وُجد المفتاح — بدون DSN وهمي.</p>
+        <p className="mt-1 text-sm text-muted">رد حقيقي إن وُجد المفتاح — بدون وعود وهمية.</p>
         {aiReady === false ? (
           <div className="mt-4 rounded-2xl border border-dashed border-border bg-bg/60 px-4 py-3 text-sm text-muted">
-            {aiReason || "أضف XAI_API_KEY في بيئة التشغيل."}
+            {aiReason || "برق AI غير جاهز في هذه البيئة."}
           </div>
         ) : null}
         <div className="mt-4 grid gap-2">
           <Input dir="rtl" value={aiQ} onChange={(e) => setAiQ(e.target.value)} disabled={aiReady === false} className="bg-bg" />
           <Button type="button" disabled={aiBusy || aiReady === false} onClick={() => void askAi()} className="bg-accent text-accent-fg">
             {aiBusy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-            {aiBusy ? "يفكّر…" : "اسأل Barq AI"}
+            {aiBusy ? "يفكّر…" : "اسأل برق AI"}
           </Button>
         </div>
         {aiAnswer ? <div className="mt-4 whitespace-pre-wrap rounded-2xl bg-bg px-4 py-3 text-sm leading-7">{aiAnswer}</div> : null}

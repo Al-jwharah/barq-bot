@@ -17,8 +17,12 @@ import { Route as InstagramRouteImport } from './routes/instagram'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LegalRouteImport } from './routes/legal'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as YoutubeRouteImport } from './routes/youtube'
+import { Route as ApiAdsRouteImport } from './routes/api/ads'
 import { Route as ApiAiPlaygroundRouteImport } from './routes/api/ai-playground'
 import { Route as ApiBackupRouteImport } from './routes/api/backup'
 import { Route as ApiFileRouteImport } from './routes/api/file'
@@ -28,6 +32,7 @@ import { Route as ApiKeepRouteImport } from './routes/api/keep'
 import { Route as ApiLeaderboardRouteImport } from './routes/api/leaderboard'
 import { Route as ApiPartnerRouteImport } from './routes/api/partner'
 import { Route as ApiPreviewRouteImport } from './routes/api/preview'
+import { Route as ApiPricingFlagsRouteImport } from './routes/api/pricing-flags'
 import { Route as ApiResolveRouteImport } from './routes/api/resolve'
 import { Route as ApiStatusRouteImport } from './routes/api/status'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
@@ -75,6 +80,21 @@ const LibraryRoute = LibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TiktokRoute = TiktokRouteImport.update({
   id: '/tiktok',
   path: '/tiktok',
@@ -83,6 +103,11 @@ const TiktokRoute = TiktokRouteImport.update({
 const YoutubeRoute = YoutubeRouteImport.update({
   id: '/youtube',
   path: '/youtube',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdsRoute = ApiAdsRouteImport.update({
+  id: '/api/ads',
+  path: '/api/ads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAiPlaygroundRoute = ApiAiPlaygroundRouteImport.update({
@@ -130,6 +155,11 @@ const ApiPreviewRoute = ApiPreviewRouteImport.update({
   path: '/api/preview',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPricingFlagsRoute = ApiPricingFlagsRouteImport.update({
+  id: '/api/pricing-flags',
+  path: '/api/pricing-flags',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiResolveRoute = ApiResolveRouteImport.update({
   id: '/api/resolve',
   path: '/api/resolve',
@@ -170,8 +200,12 @@ export interface FileRoutesByFullPath {
   '/leaderboard': typeof LeaderboardRoute
   '/legal': typeof LegalRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/register': typeof RegisterRoute
   '/tiktok': typeof TiktokRoute
   '/youtube': typeof YoutubeRoute
+  '/api/ads': typeof ApiAdsRoute
   '/api/ai-playground': typeof ApiAiPlaygroundRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
@@ -181,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
   '/api/preview': typeof ApiPreviewRoute
+  '/api/pricing-flags': typeof ApiPricingFlagsRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -197,8 +232,12 @@ export interface FileRoutesByTo {
   '/leaderboard': typeof LeaderboardRoute
   '/legal': typeof LegalRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/register': typeof RegisterRoute
   '/tiktok': typeof TiktokRoute
   '/youtube': typeof YoutubeRoute
+  '/api/ads': typeof ApiAdsRoute
   '/api/ai-playground': typeof ApiAiPlaygroundRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
@@ -208,6 +247,7 @@ export interface FileRoutesByTo {
   '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
   '/api/preview': typeof ApiPreviewRoute
+  '/api/pricing-flags': typeof ApiPricingFlagsRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -225,8 +265,12 @@ export interface FileRoutesById {
   '/leaderboard': typeof LeaderboardRoute
   '/legal': typeof LegalRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
+  '/register': typeof RegisterRoute
   '/tiktok': typeof TiktokRoute
   '/youtube': typeof YoutubeRoute
+  '/api/ads': typeof ApiAdsRoute
   '/api/ai-playground': typeof ApiAiPlaygroundRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
@@ -236,6 +280,7 @@ export interface FileRoutesById {
   '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
   '/api/preview': typeof ApiPreviewRoute
+  '/api/pricing-flags': typeof ApiPricingFlagsRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -254,8 +299,12 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/legal'
     | '/library'
+    | '/login'
+    | '/pricing'
+    | '/register'
     | '/tiktok'
     | '/youtube'
+    | '/api/ads'
     | '/api/ai-playground'
     | '/api/backup'
     | '/api/file'
@@ -265,6 +314,7 @@ export interface FileRouteTypes {
     | '/api/leaderboard'
     | '/api/partner'
     | '/api/preview'
+    | '/api/pricing-flags'
     | '/api/resolve'
     | '/api/status'
     | '/api/telegram'
@@ -281,8 +331,12 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/legal'
     | '/library'
+    | '/login'
+    | '/pricing'
+    | '/register'
     | '/tiktok'
     | '/youtube'
+    | '/api/ads'
     | '/api/ai-playground'
     | '/api/backup'
     | '/api/file'
@@ -292,6 +346,7 @@ export interface FileRouteTypes {
     | '/api/leaderboard'
     | '/api/partner'
     | '/api/preview'
+    | '/api/pricing-flags'
     | '/api/resolve'
     | '/api/status'
     | '/api/telegram'
@@ -308,8 +363,12 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/legal'
     | '/library'
+    | '/login'
+    | '/pricing'
+    | '/register'
     | '/tiktok'
     | '/youtube'
+    | '/api/ads'
     | '/api/ai-playground'
     | '/api/backup'
     | '/api/file'
@@ -319,6 +378,7 @@ export interface FileRouteTypes {
     | '/api/leaderboard'
     | '/api/partner'
     | '/api/preview'
+    | '/api/pricing-flags'
     | '/api/resolve'
     | '/api/status'
     | '/api/telegram'
@@ -336,8 +396,12 @@ export interface RootRouteChildren {
   LeaderboardRoute: typeof LeaderboardRoute
   LegalRoute: typeof LegalRoute
   LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
+  RegisterRoute: typeof RegisterRoute
   TiktokRoute: typeof TiktokRoute
   YoutubeRoute: typeof YoutubeRoute
+  ApiAdsRoute: typeof ApiAdsRoute
   ApiAiPlaygroundRoute: typeof ApiAiPlaygroundRoute
   ApiBackupRoute: typeof ApiBackupRoute
   ApiFileRoute: typeof ApiFileRoute
@@ -347,6 +411,7 @@ export interface RootRouteChildren {
   ApiLeaderboardRoute: typeof ApiLeaderboardRoute
   ApiPartnerRoute: typeof ApiPartnerRoute
   ApiPreviewRoute: typeof ApiPreviewRoute
+  ApiPricingFlagsRoute: typeof ApiPricingFlagsRoute
   ApiResolveRoute: typeof ApiResolveRoute
   ApiStatusRoute: typeof ApiStatusRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
@@ -413,6 +478,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tiktok': {
       id: '/tiktok'
       path: '/tiktok'
@@ -425,6 +511,13 @@ declare module '@tanstack/react-router' {
       path: '/youtube'
       fullPath: '/youtube'
       preLoaderRoute: typeof YoutubeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ads': {
+      id: '/api/ads'
+      path: '/api/ads'
+      fullPath: '/api/ads'
+      preLoaderRoute: typeof ApiAdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ai-playground': {
@@ -490,6 +583,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pricing-flags': {
+      id: '/api/pricing-flags'
+      path: '/api/pricing-flags'
+      fullPath: '/api/pricing-flags'
+      preLoaderRoute: typeof ApiPricingFlagsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/resolve': {
       id: '/api/resolve'
       path: '/api/resolve'
@@ -544,8 +644,12 @@ const rootRouteChildren: RootRouteChildren = {
   LeaderboardRoute: LeaderboardRoute,
   LegalRoute: LegalRoute,
   LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
+  RegisterRoute: RegisterRoute,
   TiktokRoute: TiktokRoute,
   YoutubeRoute: YoutubeRoute,
+  ApiAdsRoute: ApiAdsRoute,
   ApiAiPlaygroundRoute: ApiAiPlaygroundRoute,
   ApiBackupRoute: ApiBackupRoute,
   ApiFileRoute: ApiFileRoute,
@@ -555,6 +659,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeaderboardRoute: ApiLeaderboardRoute,
   ApiPartnerRoute: ApiPartnerRoute,
   ApiPreviewRoute: ApiPreviewRoute,
+  ApiPricingFlagsRoute: ApiPricingFlagsRoute,
   ApiResolveRoute: ApiResolveRoute,
   ApiStatusRoute: ApiStatusRoute,
   ApiTelegramRoute: ApiTelegramRoute,
@@ -565,12 +670,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

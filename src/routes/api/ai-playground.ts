@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/ai-playground")({
             ? null
             : !AI_ENABLED
               ? "BARQ_AI_ENABLED=off"
-              : "XAI_API_KEY missing — أضف المفتاح في بيئة التشغيل لتفعيل الملعب",
+              : "مفتاح برق AI غير مضبوط — أضفه في بيئة التشغيل لتفعيل الملعب",
         });
       },
       POST: async ({ request }) => {
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/ai-playground")({
               disabled: true,
               error: !AI_ENABLED
                 ? "Barq AI متوقف (BARQ_AI_ENABLED=off)"
-                : "Barq AI غير جاهز — XAI_API_KEY غير مضبوط في البيئة",
+                : "برق AI غير جاهز — المفتاح غير مضبوط في البيئة",
             },
             { status: 503 },
           );
