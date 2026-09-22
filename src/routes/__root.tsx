@@ -18,7 +18,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "برق ⚡️ حمّل أي فيديو. Barq AI يفهمك. مجاني — كوب قهوة إن أحببت. الدعم @i_2169 · info@aljwharah.ai",
+          "برق ⚡️ حمّل أي فيديو. برق AI يفهمك. مجاني — كوب قهوة إن أحببت. الدعم @i_2169 · info@aljwharah.ai",
       },
       ...(PUBLIC_ORIGIN
         ? [

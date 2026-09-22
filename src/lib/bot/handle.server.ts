@@ -145,6 +145,7 @@ import {
 import { handleLive } from "./handlers/live.handler";
 import { handleAccount, handlePoints } from "./handlers/account.handler";
 import { handleSubscription } from "./handlers/subscription.handler";
+import { isShortLinkIntent, SHORT_LINK_BTN } from "./short-intent";
 
 let membersCache = { n: 0, at: 0 };
 async function cachedMemberCount(): Promise<number> {
@@ -235,7 +236,7 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
         { text: "برق AI", callback_data: "adm:grok" },
       ],
       [
-        { text: "رابط مؤقت", callback_data: "go:short" },
+        { text: SHORT_LINK_BTN, callback_data: "go:short" },
         { text: "المراقبة", callback_data: "adm:watch" },
       ],
       [
@@ -259,7 +260,7 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
   if (role === "sub") {
     return [
       [
-        { text: "رابط مؤقت", callback_data: "go:short" },
+        { text: SHORT_LINK_BTN, callback_data: "go:short" },
         { text: "كيف يعمل", callback_data: "go:how" },
       ],
       [{ text: "دعم فني", url: SUPPORT_URL }],
@@ -276,7 +277,7 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
   }
   const rows: TgBtn[][] = [
     [{ text: "برق AI", callback_data: "go:ai" }],
-    [{ text: "رابط مؤقت", callback_data: "go:short" }],
+    [{ text: SHORT_LINK_BTN, callback_data: "go:short" }],
     [
       { text: "رحلتي", callback_data: "gx:j:list" },
       { text: "إنجازاتي", callback_data: "gx:ach" },
@@ -1560,7 +1561,7 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
 async function sendSourceLine(chatId: number, result: ExtractResult) {
   await telegram.sendMessage(chatId, `متصل من: ${platformLabelAr(result.platform)}`, {
     reply_markup: inlineKeyboard([
-      [{ text: "رابط مؤقت", callback_data: "go:short" }],
+      [{ text: SHORT_LINK_BTN, callback_data: "go:short" }],
     ]),
   });
 }

@@ -3,6 +3,7 @@ import { inGrokMode } from "./session.server";
 import { getMember, type Member } from "./store.server";
 import { isOwnerId } from "./config.server";
 import { replyKeyboard } from "./telegram.server";
+import { SHORT_LINK_BTN } from "./short-intent";
 
 export const AD_BTN = "مشاهدة إعلان لتجديد 5 فيديوهات";
 export const SUPPORT_BTN = "دعم فني";
@@ -25,7 +26,7 @@ export const OWNER_ONLY_LABELS = new Set([
 ]);
 
 export const SUB_KEYBOARD = replyKeyboard([
-  ["رابط مؤقت", "حالة الاشتراك"],
+  [SHORT_LINK_BTN, "حالة الاشتراك"],
   ["كيف يعمل", SUPPORT_BTN],
 ]);
 
@@ -34,7 +35,7 @@ export const FREE_KEYBOARD = replyKeyboard([["كيف يعمل", SUPPORT_BTN]]);
 
 /** Unlocked after first successful download — points / journey / achievements. */
 export const FREE_KEYBOARD_FULL = replyKeyboard([
-  ["رابط مؤقت", "سجلي"],
+  [SHORT_LINK_BTN, "سجلي"],
   ["حدّي", "برق AI"],
   ["رحلتي", "إنجازاتي"],
   ["أعجبني", "حسابي"],

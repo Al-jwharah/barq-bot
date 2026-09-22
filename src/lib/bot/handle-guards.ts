@@ -1,4 +1,5 @@
 import { isAppealCommand } from "./bans";
+import { SHORT_LINK_BTN, SHORT_LINK_BTN_LEGACY } from "./short-intent";
 
 export const JOB_CANCEL_PREFIX = "job:cancel:";
 export const JOB_RETRY_PREFIX = "job:retry:";
@@ -50,7 +51,9 @@ const HOSTFILE_EXIT = new Set([
   "نقاطي",
   "دعوة",
   "كوبون",
-  "رابط مؤقت",
+  SHORT_LINK_BTN,
+  SHORT_LINK_BTN_LEGACY,
+  "اختصار",
 ]);
 
 export function hostfileYieldsToDownload(text: string): boolean {

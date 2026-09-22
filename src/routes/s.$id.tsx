@@ -80,6 +80,15 @@ function ClipPage() {
         />
       )}
       <section className="mx-auto flex max-w-md flex-col gap-2 px-4 py-4">
+        {!isFile ? (
+          <a
+            href={clip.mediaUrl}
+            download
+            className="inline-flex h-12 items-center justify-center rounded-full bg-accent text-sm font-medium text-accent-fg"
+          >
+            تحميل المقطع
+          </a>
+        ) : null}
         <p className="text-center text-sm text-muted">شارك على أي منصة. سناب يفتح المعاينة إن دعم الجهاز.</p>
         <button
           type="button"

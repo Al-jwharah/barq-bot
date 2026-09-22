@@ -1,4 +1,5 @@
 import { decideHostfile } from "./handle-guards";
+import { isShortLinkIntent } from "./short-intent";
 
 export type Intent =
   | "download"
@@ -20,15 +21,6 @@ const LIVE = new Set(["/live", "البث", "live recorder"]);
 const ACCOUNT = new Set(["حسابي", "/account", "سجلي", "/history", "سجل التحميل"]);
 const POINTS = new Set(["نقاطي", "/points"]);
 const SUB = new Set(["الاشتراك", "اشترك الآن", "تجديد الاشتراك", "/sub", "حالة الاشتراك"]);
-const SHORT = new Set([
-  "رابط مؤقت",
-  "رابط مختصر 24س",
-  "رابط مختصر",
-  "اختصار",
-  "اشغله",
-  "/short",
-  "/اختصار",
-]);
 const HELP = new Set(["كيف يعمل", "/help"]);
 
 function norm(text: string): string {
@@ -37,8 +29,7 @@ function norm(text: string): string {
 
 /** True for reply-keyboard / slash aliases that start the short-link flow. */
 export function isShortCommand(text: string): boolean {
-  const n = norm(text);
-  return n.startsWith("/short") || n.startsWith("/اختصار") || SHORT.has(n);
+  return isShortLinkIntent(text);
 }
 
 export function classifyIntent(input: {
