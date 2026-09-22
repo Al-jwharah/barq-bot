@@ -162,9 +162,17 @@ export async function extractTikTok(url: string): Promise<ExtractResult> {
     if (fromApi.items.length) return { ...fromApi, sourceUrl: expanded };
   }
 
+  try {
+    const { extractWithYtdlp } = await import("../ytdlp");
+    const viaYt = await extractWithYtdlp(expanded, "tiktok");
+    if (viaYt.items.length) return { ...viaYt, platform: "tiktok", sourceUrl: expanded };
+  } catch {
+    /* fall through */
+  }
+
   throw new Error(
     isTikTokPhotoUrl(expanded)
-      ? "ما قدرت أحمّل صور تيك توك من هذا الرابط. أعد إرسال الرابط من التطبيق."
-      : "ما قدرت أحمّل فيديو تيك توك. أرسل الرابط الكامل من التطبيق.",
+      ? "ما قدرت أحمّل صور تيك توك من هذا الرابط. أعد إرسال الرابط الكامل من التطبيق."
+      : "ما قدرت أحمّل فيديو تيك توك. أرسل الرابط الكامل من التطبيق (مو مختصر).",
   );
 }

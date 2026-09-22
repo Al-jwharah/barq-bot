@@ -581,23 +581,33 @@ async function sendHostedMedia(chatId: number, fromId: number, result: ExtractRe
   const url =
     [...(item.variants ?? [])].sort((a, b) => (a.height ?? 0) - (b.height ?? 0))[0]?.url || item.url;
   if (!url) return null;
-  const { createClipLink } = await import("./store.server");
-  const origin = await clipOrigin();
-  const made = await createClipLink({
-    tgId: fromId,
-    url: result.sourceUrl,
-    mediaUrl: url,
-    thumbnail: item.thumbnail,
-    kind: item.kind,
-    platform: result.platform,
-  });
-  const short = `${origin}/d/${made.id}`;
-  const sent = await telegram.sendMessage(
-    chatId,
-    `المقطع أكبر من حد تليجرام (٥٠ ميغا).\nرابط التحميل الكامل:\n${short}`,
-    { reply_markup: inlineKeyboard([[{ text: "تحميل الملف", url: short }]]) },
-  );
-  return sent.message_id ?? null;
+  try {
+    const { createClipLink } = await import("./store.server");
+    const origin = await clipOrigin();
+    const made = await createClipLink({
+      tgId: fromId,
+      url: result.sourceUrl,
+      mediaUrl: url,
+      thumbnail: item.thumbnail,
+      kind: item.kind,
+      platform: result.platform,
+    });
+    const short = `${origin}/d/${made.id}`;
+    const sent = await telegram.sendMessage(
+      chatId,
+      `المقطع أكبر من حد تليجرام (٥٠ ميغا).\nرابط التحميل الكامل:\n${short}`,
+      { reply_markup: inlineKeyboard([[{ text: "تحميل الملف", url: short }]]) },
+    );
+    return sent.message_id ?? null;
+  } catch {
+    // Blob/short-link storage down — still give the user a direct media URL.
+    const sent = await telegram.sendMessage(
+      chatId,
+      "المقطع أكبر من حد تليجرام (٥٠ ميغا).\nالتخزين المختصر غير متاح الآن — هذا رابط مباشر للمقطع:",
+      { reply_markup: inlineKeyboard([[{ text: "فتح المقطع", url }]]) },
+    );
+    return sent.message_id ?? null;
+  }
 }
 
 function distinctHeights(item: MediaItem): number[] {
@@ -1630,9 +1640,19 @@ async function sendShortLink(chatId: number, fromId: number) {
       },
     );
   } catch {
+    if (clip.mediaUrl) {
+      await telegram.sendMessage(
+        chatId,
+        "تعذر إنشاء الرابط المختصر (التخزين معلّق أو غير جاهز).\nهذا رابط مباشر للمقطع:",
+        {
+          reply_markup: inlineKeyboard([[{ text: "فتح المقطع", url: clip.mediaUrl }]]),
+        },
+      );
+      return;
+    }
     await telegram.sendMessage(
       chatId,
-      "تعذر إنشاء الرابط المختصر. إن استمر الخطأ فتخزين الملفات (Blob) قد يكون معلّقًا — أعد المحاولة لاحقًا.",
+      "تعذر إنشاء الرابط المختصر. التخزين غير متاح الآن — أعد إرسال الرابط أو الملف لاحقًا.",
     );
   }
 }
