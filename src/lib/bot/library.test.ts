@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   choiceLabel,
@@ -39,4 +40,11 @@ test("variantForChoice picks closest height", () => {
   assert.equal(variantForChoice(item, "480").height, 480);
   assert.equal(choiceLabel("720", item.variants[1]), "720p");
   assert.equal(choiceLabel("mp3"), "MP3");
+});
+
+test("listHistory allows 20+ (cap 30) and history helpers stay exported", () => {
+  const src = readFileSync(new URL("./library.server.ts", import.meta.url), "utf8");
+  assert.match(src, /limit = 25/);
+  assert.match(src, /Math\.min\(Math\.max\(limit, 1\), 30\)/);
+  assert.match(src, /download_logs_tg_ok_idx/);
 });

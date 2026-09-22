@@ -25,6 +25,8 @@ import {
   TEMP_FILE_RETENTION_HOURS,
   TEMP_FREE,
   SUBSCRIPTIONS_LIVE,
+  REFERRALS_LIVE,
+  LEADERBOARD_LIVE,
   VIP_STARS,
   MAX_STARS,
   VAULT_ARCHIVE_ENABLED,
@@ -91,7 +93,15 @@ test("DAILY_CAP_ON default is true, TEMP_FREE default true, WATERMARK false", ()
   assert.equal(DAILY_CAP_ON, true);
   assert.equal(TEMP_FREE, true);
   assert.equal(SUBSCRIPTIONS_LIVE, false);
+  assert.equal(REFERRALS_LIVE, false);
+  assert.equal(LEADERBOARD_LIVE, false);
   assert.equal(WATERMARK_ENABLED, false);
+});
+
+test("engagement live flags stay OFF until Squad C 48h window", () => {
+  assert.equal(REFERRALS_LIVE, false);
+  assert.equal(LEADERBOARD_LIVE, false);
+  assert.equal(SUBSCRIPTIONS_LIVE, false);
 });
 
 test("feature flag defaults keep Arabic product identity on", () => {

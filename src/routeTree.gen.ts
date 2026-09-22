@@ -22,6 +22,7 @@ import { Route as ApiFileRouteImport } from './routes/api/file'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiJobsRouteImport } from './routes/api/jobs'
 import { Route as ApiKeepRouteImport } from './routes/api/keep'
+import { Route as ApiLeaderboardRouteImport } from './routes/api/leaderboard'
 import { Route as ApiPartnerRouteImport } from './routes/api/partner'
 import { Route as ApiResolveRouteImport } from './routes/api/resolve'
 import { Route as ApiStatusRouteImport } from './routes/api/status'
@@ -94,6 +95,11 @@ const ApiKeepRoute = ApiKeepRouteImport.update({
   path: '/api/keep',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeaderboardRoute = ApiLeaderboardRouteImport.update({
+  id: '/api/leaderboard',
+  path: '/api/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPartnerRoute = ApiPartnerRouteImport.update({
   id: '/api/partner',
   path: '/api/partner',
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/api/jobs': typeof ApiJobsRoute
   '/api/keep': typeof ApiKeepRoute
+  '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
@@ -160,6 +167,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/api/jobs': typeof ApiJobsRoute
   '/api/keep': typeof ApiKeepRoute
+  '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/api/jobs': typeof ApiJobsRoute
   '/api/keep': typeof ApiKeepRoute
+  '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/jobs'
     | '/api/keep'
+    | '/api/leaderboard'
     | '/api/partner'
     | '/api/resolve'
     | '/api/status'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/jobs'
     | '/api/keep'
+    | '/api/leaderboard'
     | '/api/partner'
     | '/api/resolve'
     | '/api/status'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/api/jobs'
     | '/api/keep'
+    | '/api/leaderboard'
     | '/api/partner'
     | '/api/resolve'
     | '/api/status'
@@ -269,6 +281,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   ApiJobsRoute: typeof ApiJobsRoute
   ApiKeepRoute: typeof ApiKeepRoute
+  ApiLeaderboardRoute: typeof ApiLeaderboardRoute
   ApiPartnerRoute: typeof ApiPartnerRoute
   ApiResolveRoute: typeof ApiResolveRoute
   ApiStatusRoute: typeof ApiStatusRoute
@@ -370,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKeepRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/leaderboard': {
+      id: '/api/leaderboard'
+      path: '/api/leaderboard'
+      fullPath: '/api/leaderboard'
+      preLoaderRoute: typeof ApiLeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/partner': {
       id: '/api/partner'
       path: '/api/partner'
@@ -429,6 +449,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   ApiJobsRoute: ApiJobsRoute,
   ApiKeepRoute: ApiKeepRoute,
+  ApiLeaderboardRoute: ApiLeaderboardRoute,
   ApiPartnerRoute: ApiPartnerRoute,
   ApiResolveRoute: ApiResolveRoute,
   ApiStatusRoute: ApiStatusRoute,

@@ -119,7 +119,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     if (await applyJobQuota(job.id)) {
       await bumpDownload(fromId);
       const { bumpDownloadOk } = await import("../bot/growth.server");
-      await bumpDownloadOk(fromId).catch(() => undefined);
+      await bumpDownloadOk(fromId, chatId).catch(() => undefined);
       emit("download.completed", { tgId: fromId, url: job.url });
     }
     await logDownload({ tgId: fromId, url: job.url, ok: true, platform: "cache" });
@@ -147,7 +147,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     if (await applyJobQuota(job.id)) {
       await bumpDownload(fromId);
       const { bumpDownloadOk } = await import("../bot/growth.server");
-      await bumpDownloadOk(fromId).catch(() => undefined);
+      await bumpDownloadOk(fromId, chatId).catch(() => undefined);
       emit("download.completed", { tgId: fromId, url: job.url });
     }
     await logDownload({
@@ -191,7 +191,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   if (await applyJobQuota(job.id)) {
     await bumpDownload(fromId);
     const { bumpDownloadOk } = await import("../bot/growth.server");
-    await bumpDownloadOk(fromId).catch(() => undefined);
+    await bumpDownloadOk(fromId, chatId).catch(() => undefined);
     emit("download.completed", { tgId: fromId, url: job.url });
   }
   await logDownload({ tgId: fromId, url: job.url, platform: result.platform, ok: true });

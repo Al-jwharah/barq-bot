@@ -132,10 +132,11 @@ export type HistoryRow = {
   created_at: string;
 };
 
-export async function listHistory(tgId: number, limit = 20): Promise<HistoryRow[]> {
+/** Last 20+ successful downloads (Postgres). Cap 30. */
+export async function listHistory(tgId: number, limit = 25): Promise<HistoryRow[]> {
   const sql = await getSql();
   await ensure(sql);
-  const cap = Math.min(Math.max(limit, 1), 20);
+  const cap = Math.min(Math.max(limit, 1), 30);
   return sql<HistoryRow>`
     select id, url, platform, title, created_at::text
     from download_logs
@@ -151,7 +152,7 @@ export async function searchHistory(tgId: number, query: string, limit = 20): Pr
   const sql = await getSql();
   await ensure(sql);
   const like = `%${q.replace(/[%_]/g, "")}%`;
-  const cap = Math.min(Math.max(limit, 1), 20);
+  const cap = Math.min(Math.max(limit, 1), 30);
   return sql<HistoryRow>`
     select id, url, platform, title, created_at::text
     from download_logs

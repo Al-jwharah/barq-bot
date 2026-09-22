@@ -38,9 +38,11 @@ const HOSTFILE_EXIT = new Set([
   "بدء",
   "Barq AI",
   "سجلي",
+  "مكتبتي",
   "حدّي",
   "حدي",
   "رحلتي",
+  "رحلتك",
   "إنجازاتي",
   "أعجبني",
   "كيف يعمل",
@@ -105,5 +107,18 @@ export function multiLinkStatusText(total: number, cap = MULTI_LINK_CAP): string
   if (total <= 1) return null;
   const limit = Number.isFinite(cap) && cap > 0 ? Math.trunc(cap) : MULTI_LINK_CAP;
   const skipped = total > limit ? `\nأخذت أول ${limit} فقط.` : "";
-  return `لقيت ${total} روابط — أحملها بالترتيب ⚡️${skipped}`;
+  const card = batchDots(0, 0, Math.min(total, limit));
+  return `لقيت ${total} روابط — أحملها بالترتيب ⚡️\n${card} 0/${Math.min(total, limit)}${skipped}`;
+}
+
+/** 🟢 done · 🟡 active · ⚪ pending (kept local to avoid import cycles). */
+export function batchDots(done: number, active: number, total: number): string {
+  const n = Math.max(0, Math.trunc(total));
+  const parts: string[] = [];
+  for (let i = 0; i < n; i++) {
+    if (i < done) parts.push("🟢");
+    else if (i === active) parts.push("🟡");
+    else parts.push("⚪");
+  }
+  return parts.join("");
 }

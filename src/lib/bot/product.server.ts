@@ -176,6 +176,8 @@ export async function ensureReferral(tgId: number): Promise<{ code: string; invi
 }
 
 export async function applyReferral(newUserId: number, startArg: string): Promise<boolean> {
+  const { REFERRALS_LIVE } = await import("./config.server");
+  if (!REFERRALS_LIVE) return false;
   const m = startArg.trim().match(/^ref[_-]?([a-z0-9]+)/i);
   if (!m) return false;
   const sql = await getSql();

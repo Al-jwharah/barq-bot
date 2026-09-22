@@ -9,6 +9,7 @@ import {
   decideHostfile,
   hostfileYieldsToDownload,
   MULTI_LINK_CAP,
+  batchDots,
   multiLinkStatusText,
   parseJobCancelId,
   parseJobRetryId,
@@ -107,7 +108,9 @@ test("multi-link select caps at 3 and status never silent", () => {
   assert.deepEqual(picked.batch, urls.slice(0, 3));
   assert.equal(multiLinkStatusText(1), null);
   assert.match(multiLinkStatusText(2)!, /2 روابط/);
+  assert.match(multiLinkStatusText(2)!, /🟡/);
   assert.match(multiLinkStatusText(4)!, /أول 3/);
+  assert.match(multiLinkStatusText(3)!, /⚪/);
 });
 
 test("handle.server enqueues multi-link helper and quality picker stays wired", () => {
@@ -120,4 +123,9 @@ test("handle.server enqueues multi-link helper and quality picker stays wired", 
   const worker = readFileSync(new URL("../jobs/worker.server.ts", import.meta.url), "utf8");
   assert.match(worker, /sendQualityPicker/);
   assert.match(worker, /offerAudioOnly/);
+});
+
+test("batchDots paints green/yellow/white progress", () => {
+  assert.equal(batchDots(2, 2, 5), "🟢🟢🟡⚪⚪");
+  assert.equal(batchDots(0, 0, 3), "🟡⚪⚪");
 });
