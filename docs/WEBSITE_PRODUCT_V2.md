@@ -39,3 +39,13 @@ XAI_API_KEY=
 - No `vercel --prod`
 - Did not set BARQ_SUBSCRIPTIONS_LIVE / LEADERBOARD_LIVE / REFERRALS_LIVE true on production
 - No secret delete/rotate; no DROP/TRUNCATE
+
+
+## Preview URL
+
+https://barq-p000vhuq5-abdulrhmaan999-4640s-projects.vercel.app
+
+Deployed: 2026-09-22 ~19:18 Asia/Riyadh · Vercel project `barq-vid` · **preview only** (target=null, not production).
+
+Smoke: `/` `/pricing` `/login` `/register` `/api/ads` `/api/pricing-flags` → 200.
+Flags observed: `BARQ_SUBSCRIPTIONS_LIVE=false`, `BARQ_ADS_ENABLED=false`, `BARQ_SUBSCRIPTIONS_UI=true`.
