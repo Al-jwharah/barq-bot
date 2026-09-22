@@ -27,14 +27,7 @@ function rankImage(url: string): number {
   return 1080 * 1080;
 }
 
-export async function extractInstagram(url: string): Promise<ExtractResult> {
-  const code = instagramShortcode(url);
-  const pageUrl = code
-    ? `https://www.instagram.com/p/${code}/embed/captioned/`
-    : url;
-
-  const { text } = await fetchText(pageUrl, undefined, 12000);
-
+function parseEmbed(text: string): { videos: string[]; images: string[]; caption?: string } {
   const videos = [
     ...text.matchAll(
       /(?:video_url|og:video|property="og:video" content)["=\s:]+["']?(https?:\/\/[^"'<\s]+)/gi,
@@ -52,15 +45,52 @@ export async function extractInstagram(url: string): Promise<ExtractResult> {
     .map((m) => igUpgradeImage(unescapeJson(m[1] ?? "")))
     .filter((u) => u.startsWith("http") && !u.includes("rsrc.php"));
 
-  const uniqueVideos = [...new Set(videos)];
-  const uniqueImages = [...new Set(images)].sort((a, b) => rankImage(b) - rankImage(a)).slice(0, 8);
+  const caption =
+    text.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/)?.[1]?.replace(/<[^>]+>/g, " ").trim() ??
+    undefined;
+
+  return { videos: [...new Set(videos)], images: [...new Set(images)], caption };
+}
+
+function embedCandidates(code: string | null, url: string): string[] {
+  if (!code) return [url];
+  const bases = [
+    `https://www.instagram.com/p/${code}/embed/captioned/`,
+    `https://www.instagram.com/reel/${code}/embed/captioned/`,
+    `https://www.instagram.com/tv/${code}/embed/captioned/`,
+    `https://www.instagram.com/p/${code}/embed/`,
+    `https://www.instagram.com/reel/${code}/embed/`,
+  ];
+  return [...new Set(bases)];
+}
+
+export async function extractInstagram(url: string): Promise<ExtractResult> {
+  const code = instagramShortcode(url);
+  let bestVideos: string[] = [];
+  let bestImages: string[] = [];
+  let caption: string | undefined;
+
+  for (const pageUrl of embedCandidates(code, url)) {
+    try {
+      const { text } = await fetchText(pageUrl, undefined, 12000);
+      const parsed = parseEmbed(text);
+      if (parsed.videos.length > bestVideos.length) bestVideos = parsed.videos;
+      if (parsed.images.length > bestImages.length) {
+        bestImages = parsed.images.sort((a, b) => rankImage(b) - rankImage(a)).slice(0, 8);
+      }
+      if (!caption && parsed.caption) caption = parsed.caption;
+      if (bestVideos.length) break;
+    } catch {
+      /* try next embed shape */
+    }
+  }
 
   const items: MediaItem[] = [];
-  for (const v of uniqueVideos) {
+  for (const v of bestVideos) {
     items.push({
       kind: "video",
       url: v,
-      thumbnail: uniqueImages[0],
+      thumbnail: bestImages[0],
       variants: [
         {
           url: v,
@@ -71,7 +101,7 @@ export async function extractInstagram(url: string): Promise<ExtractResult> {
     });
   }
   if (items.length === 0) {
-    for (const img of uniqueImages) {
+    for (const img of bestImages) {
       items.push({
         kind: "photo",
         url: img,
@@ -80,13 +110,19 @@ export async function extractInstagram(url: string): Promise<ExtractResult> {
       });
     }
   }
-  if (items.length === 0) {
-    throw new Error("ما قدرت أقرأ الميديا من إنستغرام. جرّب رابط عام");
-  }
 
-  const caption =
-    text.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/)?.[1]?.replace(/<[^>]+>/g, " ").trim() ??
-    undefined;
+  if (items.length === 0) {
+    try {
+      const { extractWithYtdlp } = await import("../ytdlp");
+      const viaYt = await extractWithYtdlp(url, "instagram");
+      if (viaYt.items.length) {
+        return { ...viaYt, platform: "instagram", id: code ?? viaYt.id, sourceUrl: url };
+      }
+    } catch {
+      /* fall through */
+    }
+    throw new Error("ما قدرت أقرأ الميديا من إنستغرام. جرّب رابط منشور عام (مو خاص).");
+  }
 
   return {
     platform: "instagram",

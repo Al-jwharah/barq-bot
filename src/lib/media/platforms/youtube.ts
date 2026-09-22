@@ -301,20 +301,44 @@ async function extractCobalt(url: string, id: string): Promise<ExtractResult | n
   return null;
 }
 
-function assertFitsTelegram(result: ExtractResult) {
+const TELEGRAM_SOFT_CAP = 45 * 1024 * 1024;
+
+/** Prefer variants under Telegram cloud cap; only throw when every known size is over. */
+function fitYouTubeForTelegram(result: ExtractResult): ExtractResult {
   const item = result.items[0];
-  const duration = item?.duration ?? 0;
-  const smallest =
-    [...(item?.variants ?? [])]
-      .map((v) => v.size ?? 0)
-      .filter((n) => n > 0)
-      .sort((a, b) => a - b)[0] ?? 0;
-  if (smallest > 45 * 1024 * 1024 || duration > 12 * 60) {
-    const mins = Math.max(1, Math.round(duration / 60));
+  if (!item) return result;
+  const variants = item.variants?.length
+    ? [...item.variants]
+    : item.url
+      ? [{ url: item.url, quality: "أصل", contentType: "video/mp4", size: undefined as number | undefined }]
+      : [];
+  const knownOver = variants.filter((v) => typeof v.size === "number" && v.size > 0 && v.size > TELEGRAM_SOFT_CAP);
+  const under = variants.filter((v) => !(typeof v.size === "number" && v.size > 0 && v.size > TELEGRAM_SOFT_CAP));
+  if (under.length === 0 && knownOver.length > 0) {
+    const mins = Math.max(1, Math.round((item.duration ?? 0) / 60));
     throw new Error(
       `هذا المقطع ${mins} دقيقة وأكبر من حد تليجرام (50 ميغابايت). أرسل شورتس أو فيديو أقصر.`,
     );
   }
+  const ranked = (under.length ? under : variants).sort(
+    (a, b) =>
+      (a.size ?? Number.MAX_SAFE_INTEGER) - (b.size ?? Number.MAX_SAFE_INTEGER) ||
+      (a.height ?? 9999) - (b.height ?? 9999),
+  );
+  const best = ranked[0]!;
+  return {
+    ...result,
+    items: [
+      {
+        ...item,
+        url: best.url,
+        width: best.width ?? item.width,
+        height: best.height ?? item.height,
+        variants: ranked,
+      },
+      ...result.items.slice(1),
+    ],
+  };
 }
 
 export async function extractYouTube(url: string): Promise<ExtractResult> {
@@ -322,10 +346,7 @@ export async function extractYouTube(url: string): Promise<ExtractResult> {
   if (!id) throw new Error("هذا مو رابط يوتيوب واضح");
   const watch = `https://www.youtube.com/watch?v=${id}`;
 
-  const finish = (result: ExtractResult) => {
-    assertFitsTelegram(result);
-    return result;
-  };
+  const finish = (result: ExtractResult) => fitYouTubeForTelegram(result);
 
   for (const client of CLIENTS) {
     try {
