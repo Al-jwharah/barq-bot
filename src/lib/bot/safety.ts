@@ -89,9 +89,26 @@ const STUDIO_RE =
   /\b(brazzers|bangbros|reality[\s-]?kings|digital[\s-]?playground|vixen\b|blacked\b|tushy\b|naughty[\s-]?america|bellesa|deeper\.com|pornpros|fake[\s-]?taxi)\b/i;
 
 const FILM_RE =
-  /\b((full\s+)?porn(ographic)?\s*(movie|film|video)|xxx\s*(movie|film)|adult\s+(film|movie|content)|nsfw|onlyfans|fansly|18\+|age[-\s]?restricted)\b/i;
+  /\b((full\s+)?porn(ographic)?\s*(movie|film|video)|xxx\s*(movie|film)|adult\s+(film|movie)|onlyfans|fansly)\b/i;
 
-const AR_FILM_RE = /فيلم\s*(سكس|إباحي|اباحي|بورن)|بورن|مقطع\s*إباحي|سكس|إباحي|اباحي|\+?\s*18/;
+/** Explicit Arabic porn-film phrases only — bare إباحي/سكس alone are common in religious warnings. */
+const AR_FILM_RE = /فيلم\s*(سكس|إباحي|اباحي|بورن)|مقطع\s*إباحي|بورن/;
+
+/** Mainstream platforms: never block on porn keywords (CSAM still blocked). Domain blocklist is separate. */
+const MAINSTREAM_DOMAINS = [
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+  "instagram.com",
+  "facebook.com",
+  "fb.watch",
+  "x.com",
+  "twitter.com",
+  "reddit.com",
+  "vimeo.com",
+  "snapchat.com",
+  "threads.net",
+];
 
 /** Only underage / CSAM material remains auto-ban + hard-block. */
 const CSAM_RE =
@@ -110,6 +127,15 @@ function hostnameOf(url: string): string | null {
 
 function hostMatchesDomain(host: string, domain: string): boolean {
   return host === domain || host.endsWith(`.${domain}`);
+}
+
+function isMainstreamHost(url: string): boolean {
+  const host = hostnameOf(url);
+  if (!host) return false;
+  for (const domain of MAINSTREAM_DOMAINS) {
+    if (hostMatchesDomain(host, domain)) return true;
+  }
+  return false;
 }
 
 export function matchPornDomain(url: string): { domain: string } | null {
@@ -205,6 +231,11 @@ export function metadataVerdict(input: {
   if (csam) {
     return { block: true, kind: "csam", confidence: 1, evidence: csam };
   }
+  // Mainstream hosts: never block on porn keywords (religious/educational mentions of الإباحية etc.).
+  // CSAM above still applies; PORN_DOMAINS never matches these hosts.
+  if (isMainstreamHost(input.url)) {
+    return null;
+  }
   const porn = matchPornKeywords(blob);
   if (porn) {
     return { block: true, kind: "nsfw", confidence: 0.95, evidence: porn };
@@ -287,13 +318,18 @@ export function parseGrokVerdict(raw: string): PornVerdict | null {
       kind === "domain" ||
       kindRaw === "adult" ||
       kindRaw === "18+";
-    // Music/women never block via Grok — product choice. Porn/NSFW/CSAM do.
-    if (parsed.block === true && pornBlock && confidence >= 0.5) {
+    // Music/women never block via classifier — product choice. Porn/NSFW/CSAM do.
+    // NSFW needs high confidence (>=0.85); porn_film/domain need >=0.7. Prefer hardcore film/domain.
+    const nsfwOk = kind === "nsfw" && confidence >= 0.85;
+    const hardOk =
+      (kind === "porn_film" || kind === "domain" || kindRaw === "adult" || kindRaw === "18+") &&
+      confidence >= 0.7;
+    if (parsed.block === true && pornBlock && (nsfwOk || hardOk)) {
       return {
         block: true,
         kind: kind === "domain" || kind === "porn_film" || kind === "nsfw" ? kind : "nsfw",
         confidence,
-        evidence: evidence || "محتوى إباحي أو +18 محظور.",
+        evidence: evidence || "محتوى إباحي محظور.",
       };
     }
     return {

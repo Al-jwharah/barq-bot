@@ -25,11 +25,15 @@ test("porn domains and NSFW keywords block", () => {
   assert.ok(matchPornDomain("https://cdn.phncdn.com/videos/a.mp4"));
   assert.ok(matchPornKeywords("Brazzers official scene"));
   assert.ok(matchPornKeywords("فيلم سكس كامل"));
-  assert.ok(matchPornKeywords("nsfw 18+ onlyfans"));
+  assert.ok(matchPornKeywords("onlyfans leaked video"));
+  assert.ok(matchPornKeywords("full pornographic movie download"));
+  assert.equal(matchPornKeywords("موعظة عن خطر الإباحية"), null);
+  assert.equal(matchPornKeywords("احذروا مواقع الإباحي"), null);
+  assert.equal(matchPornKeywords("nsfw tip"), null);
   const d = domainVerdict("https://www.pornhub.com/video");
   assert.equal(d?.block, true);
   assert.equal(d?.kind, "domain");
-  const m = metadataVerdict({ url: "https://example.com/a", title: "nsfw 18+ onlyfans" });
+  const m = metadataVerdict({ url: "https://example.com/a", title: "onlyfans leaked video" });
   assert.equal(m?.block, true);
   assert.equal(m?.kind, "nsfw");
 });
@@ -89,6 +93,34 @@ test("assertPreExtractBlocklist throws MediaBlockedError before extract", () => 
   );
   assert.doesNotThrow(() => assertPreExtractBlocklist("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
   assert.doesNotThrow(() => assertPreExtractBlocklist("https://x.com/user/status/123"));
+  assert.doesNotThrow(() => assertPreExtractBlocklist("https://vt.tiktok.com/ZSqoLyr2c"));
+});
+
+test("religious TikTok metadata on mainstream hosts is not blocked by porn keywords", () => {
+  const titles = [
+    "موعظة عن خطر الإباحية",
+    "احذروا مواقع الإباحي",
+    "نصيحة دينية",
+    "سورة البقرة",
+  ];
+  for (const title of titles) {
+    const v = metadataVerdict({ url: "https://vt.tiktok.com/ZSqoLyr2c", title });
+    assert.equal(v, null, `should allow title: ${title}`);
+  }
+  // CSAM on mainstream still blocks
+  const csam = metadataVerdict({
+    url: "https://vt.tiktok.com/ZSqoLyr2c",
+    title: "child porn archive",
+  });
+  assert.equal(csam?.block, true);
+  assert.equal(csam?.kind, "csam");
+  // Non-mainstream host with clear porn-film phrase still blocks
+  const film = metadataVerdict({
+    url: "https://random-blog.example/watch",
+    title: "فيلم سكس كامل",
+  });
+  assert.equal(film?.block, true);
+  assert.equal(film?.kind, "nsfw");
 });
 
 test("extractMedia source calls assertPreExtractBlocklist before unwrap/extract", () => {
