@@ -115,7 +115,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     const cap = "⚡ من كاش برق";
     if (hit.kind === "audio") await telegram.sendAudioUrl(chatId, hit.fileId, { caption: cap });
     else await telegram.sendVideoUrl(chatId, hit.fileId, { caption: cap, supports_streaming: true });
-    await sendAfterDownload(chatId);
+    await sendAfterDownload(chatId, fromId);
     if (await applyJobQuota(job.id)) {
       await bumpDownload(fromId);
       const { bumpDownloadOk } = await import("../bot/growth.server");
@@ -197,7 +197,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   await logDownload({ tgId: fromId, url: job.url, platform: result.platform, ok: true });
   markProcessed();
   if (mid) await telegram.deleteMessage(chatId, mid).catch(() => undefined);
-  await sendAfterDownload(chatId);
+  await sendAfterDownload(chatId, fromId);
   return "ok";
 }
 

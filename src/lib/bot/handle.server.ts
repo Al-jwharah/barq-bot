@@ -8,6 +8,7 @@ import { botDeepLink, clipCaption, platformLabelAr, TRY_BOT_LABEL } from "./bran
 import {
   BOT_DISPLAY_NAME,
   BOT_USERNAME,
+  AI_ENABLED,
   TEMP_FREE,
   MAINTENANCE,
   MAINTENANCE_TEXT,
@@ -126,9 +127,21 @@ import {
   type UserRole,
 } from "./keyboard";
 import { classifyIntent } from "./router";
+import { aiEntryCopy, decideAiRoute } from "./ai/route";
+import { postDeliveryAiRows, postDeliveryCaption, captionMenuRows } from "./ai/post-delivery";
+import { parseCaptionCallback } from "./ai/captions";
+import { SUBTITLES_TOGGLE_CALLBACK } from "./ai/subtitles";
 import { publicStartCaption } from "./copy";
 import { handleUpload } from "./handlers/upload.handler";
-import { handleAnalyze, handleStudio } from "./handlers/ai.handler";
+import {
+  handleAnalyze,
+  handleStudio,
+  handleSummarize,
+  handleSmartCaption,
+  handleSmartClips,
+  handleSubtitles,
+  handleSubtitlesToggle,
+} from "./handlers/ai.handler";
 import { handleLive } from "./handlers/live.handler";
 import { handleAccount, handlePoints } from "./handlers/account.handler";
 import { handleSubscription } from "./handlers/subscription.handler";
@@ -739,7 +752,7 @@ export async function fulfillQualityPick(chatId: number, fromId: number, pickId:
     ok: true,
     title: result.title ?? result.text,
   }).catch(() => undefined);
-  await sendAfterDownload(chatId);
+  await sendAfterDownload(chatId, fromId);
 }
 
 async function sendHistoryList(chatId: number, fromId: number, rows: import("./library.server").HistoryRow[], heading: string) {
@@ -1296,6 +1309,45 @@ async function handleCallback(cb: TgCallbackQuery) {
     await handleStudio(targetChat, fromId, member);
     return;
   }
+  if (data === "ai:sum") {
+    await telegram.answerCallback(cb.id, "تلخيص…");
+    await telegram.sendChatAction(targetChat, "typing");
+    await handleSummarize(targetChat, fromId, member);
+    return;
+  }
+  if (data === "ai:cap:menu") {
+    await telegram.answerCallback(cb.id);
+    await telegram.sendMessage(targetChat, "اختر نبرة الكابشن:", {
+      reply_markup: inlineKeyboard(captionMenuRows()),
+    });
+    return;
+  }
+  {
+    const tone = parseCaptionCallback(data);
+    if (tone) {
+      await telegram.answerCallback(cb.id, "كابشن…");
+      await telegram.sendChatAction(targetChat, "typing");
+      await handleSmartCaption(targetChat, fromId, member, tone);
+      return;
+    }
+  }
+  if (data === "ai:clips") {
+    await telegram.answerCallback(cb.id, "مقاطع…");
+    await telegram.sendChatAction(targetChat, "typing");
+    await handleSmartClips(targetChat, fromId, member);
+    return;
+  }
+  if (data === "ai:subs") {
+    await telegram.answerCallback(cb.id);
+    await telegram.sendChatAction(targetChat, "typing");
+    await handleSubtitles(targetChat, fromId, member);
+    return;
+  }
+  if (data === SUBTITLES_TOGGLE_CALLBACK) {
+    await telegram.answerCallback(cb.id);
+    await handleSubtitlesToggle(targetChat, fromId, member);
+    return;
+  }
   if (data === "pt:redeem") {
     await telegram.answerCallback(cb.id);
     const { redeemPoints } = await import("./points.server");
@@ -1374,11 +1426,9 @@ async function handleCallback(cb: TgCallbackQuery) {
   }
   if (data === "go:ai") {
     await telegram.answerCallback(cb.id);
-    await telegram.sendMessage(
-      targetChat,
-      "أنا Barq AI. اكتب أي شيء: لخّص الفيديو، اشرح، حوّل فكرة، أو الصق رابطًا للتحميل.",
-      { reply_markup: await keysFor(fromId, member) },
-    );
+    await telegram.sendMessage(targetChat, aiEntryCopy(BARQ_AI_DAILY), {
+      reply_markup: await keysFor(fromId, member),
+    });
     return;
   }
   if (data === "go:short") {
@@ -1507,15 +1557,17 @@ function pickPlayUrl(result: ExtractResult): string | undefined {
   return ranked[0]?.url || item.url;
 }
 
-/** Post-download UX: short line + at most one share button. Quality/MP3 live on offerAudioOnly / sendQualityPicker. */
-export async function sendAfterDownload(chatId: number) {
-  const clip = lastClip(chatId);
+/** Post-download UX: AI actions (لخّصه / كابشن / مقاطع / ترجمة) + share. */
+export async function sendAfterDownload(chatId: number, fromId?: number) {
+  const uid = fromId ?? chatId;
+  const clip = lastClip(uid) ?? lastClip(chatId);
   const { shareTargets } = await import("./product.server");
   const url = clip?.url || `https://t.me/${BOT_USERNAME}`;
   const s = shareTargets(url, clip?.title);
+  const rows = postDeliveryAiRows(clip, s.telegram);
   await swallowSideEffect(() =>
-    telegram.sendMessage(chatId, "تم التحميل ⚡️", {
-      reply_markup: inlineKeyboard([[{ text: "مشاركة", url: s.telegram }]]),
+    telegram.sendMessage(chatId, postDeliveryCaption(AI_ENABLED), {
+      reply_markup: inlineKeyboard(rows),
     }),
   );
 }
@@ -1531,6 +1583,7 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
     mediaUrl,
     thumbnail: item.thumbnail,
     kind: item.kind,
+    duration: item.duration,
   });
 }
 
@@ -2323,11 +2376,14 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       await enterGrokMode(chatId, fromId);
       return;
     }
-    await telegram.sendMessage(
-      chatId,
-      `أنا Barq AI. اكتب أي شيء: لخّص الفيديو، ابحث عن مقطع، اشرح، أو حوّل فكرة.\n${BARQ_AI_DAILY} رسائل يوميًا. التحميل مجاني — الصق الرابط.`,
-      { reply_markup: await keysFor(fromId, member) },
-    );
+    const route = decideAiRoute(text);
+    if (route.kind === "chat") {
+      await handleBarqChat(chatId, fromId, route.prompt);
+      return;
+    }
+    await telegram.sendMessage(chatId, aiEntryCopy(BARQ_AI_DAILY), {
+      reply_markup: await keysFor(fromId, member),
+    });
     return;
   }
   if (text.startsWith("/live") || text === "البث" || text === "Live Recorder") {
@@ -2453,7 +2509,22 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       await handleOwnerChat(chatId, text || "(رسالة بلا نص)", fromId);
       return;
     }
-    await handleBarqChat(chatId, fromId, text || "مرحبا");
+    const route = decideAiRoute(text || "");
+    if (route.kind === "skip") {
+      await telegram.sendMessage(
+        chatId,
+        "أرسل رابطًا للتحميل، أو اكتب لـ Barq AI مباشرة.",
+        { reply_markup: await keysFor(fromId, member) },
+      );
+      return;
+    }
+    if (route.kind === "entry") {
+      await telegram.sendMessage(chatId, aiEntryCopy(BARQ_AI_DAILY), {
+        reply_markup: await keysFor(fromId, member),
+      });
+      return;
+    }
+    await handleBarqChat(chatId, fromId, route.prompt);
     return;
   }
 

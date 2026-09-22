@@ -59,3 +59,11 @@ test("رابط مؤقت => short", () => {
 test("hello => other", () => {
   assert.equal(classifyIntent({ text: "hello", urls: [], hasFile: false }), "other");
 });
+
+test("/ai لخص => ai", () => {
+  assert.equal(classifyIntent({ text: "/ai لخص المقطع", urls: [], hasFile: false }), "ai");
+});
+
+test("/grok => ai", () => {
+  assert.equal(classifyIntent({ text: "/grok", urls: [], hasFile: false }), "ai");
+});
