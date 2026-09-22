@@ -765,7 +765,7 @@ async function runOwnerTool(name: string, rawArgs: string, fromId?: number | str
     const key = String(args.key ?? "").trim();
     let value = String(args.value ?? "").trim();
     if (!ALLOWED_GROK_SETTINGS.has(key)) return JSON.stringify({ error: "إعداد غير مسموح" });
-    if (key === "porn_filter") return JSON.stringify({ ok: true, note: "فلتر البالغين/الموسيقى متوقف — يبقى حظر استغلال القُصّر فقط", value: "off" });
+    if (key === "porn_filter") return JSON.stringify({ ok: true, note: "حظر مواقع الإباحية/NSFW + CSAM مفعّل في مسار الاستخراج؛ إعداد اللوحة لا يُطفئه. فلتر الموسيقى متوقف.", value: "on" });
     if (key === "required_channel") {
       const { normalizeChannel } = await import("./brand");
       value = normalizeChannel(value);

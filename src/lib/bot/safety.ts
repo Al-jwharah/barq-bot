@@ -17,11 +17,83 @@ export class MediaBlockedError extends Error {
   }
 }
 
-/** User-facing purpose: general video downloader (not Islamic-only / music-blocked). */
+/** User-facing purpose: general video downloader (music allowed; adult tube sites blocked). */
 export const BOT_PURPOSE =
   "برق ⚡️ لتحميل الفيديو\n\nالصق الرابط ويصلك الملف.\nيدعم يوتيوب وتيك توك وإنستغرام وإكس وغيرها.";
 
-/** Only underage / CSAM material remains blocked. Adult NSFW, music, and “women/harem” soft blocks are off. */
+const PORN_TLDS = new Set(["xxx", "sex", "porn", "adult"]);
+
+/** Existing adult-tube / NSFW hosting blocklist — checked BEFORE extract/download. */
+const PORN_DOMAINS = new Set([
+  "pornhub.com",
+  "pornhub.org",
+  "pornhub.net",
+  "pornhubpremium.com",
+  "xvideos.com",
+  "xvideos.es",
+  "xvideos2.com",
+  "xnxx.com",
+  "xnxx.es",
+  "xnxx.tv",
+  "xhamster.com",
+  "xhamster.desi",
+  "xhamster2.com",
+  "xhamsterlive.com",
+  "redtube.com",
+  "youporn.com",
+  "spankbang.com",
+  "tube8.com",
+  "tnaflix.com",
+  "beeg.com",
+  "eporner.com",
+  "hqporner.com",
+  "spankwire.com",
+  "keezmovies.com",
+  "porntube.com",
+  "4tube.com",
+  "porntrex.com",
+  "porn00.org",
+  "porn300.com",
+  "xozilla.com",
+  "youjizz.com",
+  "motherless.com",
+  "pornone.com",
+  "pornhat.com",
+  "sxyprn.com",
+  "xmoviesforyou.com",
+  "fapster.xxx",
+  "chaturbate.com",
+  "stripchat.com",
+  "bongacams.com",
+  "cam4.com",
+  "onlyfans.com",
+  "fansly.com",
+  "manyvids.com",
+  "clips4sale.com",
+  "adultempire.com",
+  "jable.tv",
+  "missav.com",
+  "missav.ws",
+  "javmost.com",
+  "javlibrary.com",
+  "avgle.com",
+  "hanime.tv",
+  "rule34.xxx",
+  "nhentai.net",
+  "xvideos-cdn.com",
+  "phncdn.com",
+  "xnxx-cdn.com",
+]);
+
+const STUDIO_RE =
+  /\b(brazzers|bangbros|reality[\s-]?kings|digital[\s-]?playground|vixen\b|blacked\b|tushy\b|naughty[\s-]?america|bellesa|deeper\.com|pornpros|fake[\s-]?taxi)\b/i;
+
+const FILM_RE =
+  /\b((full\s+)?porn(ographic)?\s*(movie|film|video)|xxx\s*(movie|film)|adult\s+(film|movie|content)|nsfw|onlyfans|fansly|18\+|age[-\s]?restricted)\b/i;
+
+const AR_FILM_RE = /فيلم\s*(سكس|إباحي|اباحي|بورن)|بورن|مقطع\s*إباحي|سكس|إباحي|اباحي|\+?\s*18/;
+
+/** Only underage / CSAM material remains auto-ban + hard-block. */
 const CSAM_RE =
   /\b(csam|child\s*porn|child\s*sex(?:ual)?|underage\s*(?:sex|porn|nude)|pedo(?:phile|philia)?|preteen\s*(?:sex|porn)|infant\s*porn)\b/i;
 
@@ -36,27 +108,50 @@ function hostnameOf(url: string): string | null {
   }
 }
 
-/** @deprecated Adult domain blocklists removed — always null. Kept for import compatibility. */
-export function matchPornDomain(_url: string): { domain: string } | null {
+function hostMatchesDomain(host: string, domain: string): boolean {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+export function matchPornDomain(url: string): { domain: string } | null {
+  const host = hostnameOf(url);
+  if (!host) return null;
+  const labels = host.split(".");
+  const tld = labels[labels.length - 1];
+  if (tld && PORN_TLDS.has(tld)) {
+    return { domain: host };
+  }
+  for (const domain of PORN_DOMAINS) {
+    if (hostMatchesDomain(host, domain)) return { domain };
+  }
   return null;
 }
 
-/** @deprecated Music domain blocklists removed — always null. */
+/** Music domain blocklists stay off (product choice). */
 export function matchMusicDomain(_url: string): { domain: string } | null {
   return null;
 }
 
-/** @deprecated Adult keyword blocks removed — always null. */
-export function matchPornKeywords(_text: string): string | null {
+export function matchPornKeywords(text: string): string | null {
+  const sample = text.slice(0, 1800);
+  if (STUDIO_RE.test(sample)) {
+    const m = sample.match(STUDIO_RE);
+    return `استوديو أفلام إباحية معروف: ${m?.[1] ?? "studio"}`;
+  }
+  if (AR_FILM_RE.test(sample)) {
+    return "النص يشير إلى محتوى إباحي أو +18.";
+  }
+  if (FILM_RE.test(sample)) {
+    return "النص يشير إلى محتوى للبالغين أو إباحي.";
+  }
   return null;
 }
 
-/** @deprecated Music keyword blocks removed — always null. */
+/** Music keyword blocks stay off. */
 export function matchMusicKeywords(_text: string): string | null {
   return null;
 }
 
-/** @deprecated Women/harem soft blocks removed — always null. */
+/** Women/harem soft blocks stay off. */
 export function matchWomenKeywords(_text: string): string | null {
   return null;
 }
@@ -69,17 +164,30 @@ export function matchCsamKeywords(text: string): string | null {
   return null;
 }
 
-/** Auto-ban only for CSAM hits — never for ordinary adult/music content. */
+/** Auto-ban for CSAM and clear adult-tube / NSFW hits. Music/women never ban. */
 export function isBanKind(kind: string): boolean {
-  return kind === "csam";
+  return kind === "csam" || kind === "porn_film" || kind === "nsfw" || kind === "domain";
 }
 
-export function userBlockMessage(_kind = "other"): string {
+export function userBlockMessage(kind = "other"): string {
+  if (kind === "csam") return "هذا المحتوى محظور (حماية القُصّر).";
+  if (kind === "domain" || kind === "porn_film" || kind === "nsfw") {
+    return "هذا الرابط محظور — مواقع ومحتوى إباحي غير مسموح.";
+  }
   return "";
 }
 
-/** Adult/music domain verdicts disabled. */
-export function domainVerdict(_url: string): PornVerdict | null {
+/** Porn/NSFW domain verdicts only — music domains intentionally not blocked. */
+export function domainVerdict(url: string): PornVerdict | null {
+  const porn = matchPornDomain(url);
+  if (porn) {
+    return {
+      block: true,
+      kind: "domain",
+      confidence: 1,
+      evidence: `الموقع ${porn.domain} مخصّص للمحتوى الإباحي.`,
+    };
+  }
   return null;
 }
 
@@ -97,7 +205,36 @@ export function metadataVerdict(input: {
   if (csam) {
     return { block: true, kind: "csam", confidence: 1, evidence: csam };
   }
+  const porn = matchPornKeywords(blob);
+  if (porn) {
+    return { block: true, kind: "nsfw", confidence: 0.95, evidence: porn };
+  }
   return null;
+}
+
+/**
+ * Sync gate used BEFORE extractMedia / yt-dlp download.
+ * Domain + URL-keyword + CSAM checks only — does not rewrite platform extractors.
+ */
+export function assertPreExtractBlocklist(url: string): void {
+  const domain = domainVerdict(url);
+  if (domain?.block) {
+    throw new MediaBlockedError(userBlockMessage(domain.kind), domain.evidence, domain.kind);
+  }
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    decoded = url;
+  }
+  const meta = metadataVerdict({ url: decoded });
+  if (meta?.block) {
+    throw new MediaBlockedError(
+      meta.kind === "csam" ? userBlockMessage("csam") : userBlockMessage(meta.kind),
+      meta.evidence,
+      meta.kind,
+    );
+  }
 }
 
 export function parseGrokVerdict(raw: string): PornVerdict | null {
@@ -124,7 +261,6 @@ export function parseGrokVerdict(raw: string): PornVerdict | null {
       kindRaw === "child" ||
       kindRaw === "underage" ||
       kindRaw === "child_porn";
-    // Adult/music/women never block via Grok — only CSAM.
     if (parsed.block === true && isCsam && confidence >= 0.7) {
       return {
         block: true,
@@ -145,6 +281,21 @@ export function parseGrokVerdict(raw: string): PornVerdict | null {
       kindRaw === "csam"
         ? (kindRaw as PornVerdict["kind"])
         : "other";
+    const pornBlock =
+      kind === "porn_film" ||
+      kind === "nsfw" ||
+      kind === "domain" ||
+      kindRaw === "adult" ||
+      kindRaw === "18+";
+    // Music/women never block via Grok — product choice. Porn/NSFW/CSAM do.
+    if (parsed.block === true && pornBlock && confidence >= 0.5) {
+      return {
+        block: true,
+        kind: kind === "domain" || kind === "porn_film" || kind === "nsfw" ? kind : "nsfw",
+        confidence,
+        evidence: evidence || "محتوى إباحي أو +18 محظور.",
+      };
+    }
     return {
       block: false,
       kind,

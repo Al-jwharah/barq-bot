@@ -57,7 +57,7 @@ import { rateLimitUser } from "./rate-limit.server";
 import { friendlyError, logEvent, requestId } from "./observability.server";
 import { maybeFunnyAd } from "./ads.server";
 import { stampMedia } from "./watermark.server";
-import { MediaBlockedError, metadataVerdict, userBlockMessage } from "./safety";
+import { MediaBlockedError, domainVerdict, metadataVerdict, userBlockMessage } from "./safety";
 import { awaitMap, busySet, clearAwait, heroFileId, inGrokMode, lastClip, peekAwait, setAwait, setHeroFileId, setLastClip, setLastOwnerMedia } from "./session.server";
 import { botSettings, downloadAccess, joinHref } from "./settings.server";
 import { liveUsername, markError, markProcessed } from "./state";
@@ -1590,9 +1590,24 @@ async function maybeAd(chatId: number, fromId: number) {
 export async function assertSafeMedia(url: string, result?: ExtractResult) {
   const { assertSafeOutboundUrl } = await import("../media/ssrf");
   await assertSafeOutboundUrl(url);
+  // Porn/NSFW domain blocklist BEFORE any further extract/download work.
+  const domain = domainVerdict(url);
+  if (domain?.block) {
+    throw new MediaBlockedError(userBlockMessage(domain.kind), domain.evidence, domain.kind);
+  }
   if (result) {
     for (const item of result.items) {
       if (item.url) await assertSafeOutboundUrl(item.url).catch(() => undefined);
+      if (item.url) {
+        const itemDomain = domainVerdict(item.url);
+        if (itemDomain?.block) {
+          throw new MediaBlockedError(
+            userBlockMessage(itemDomain.kind),
+            itemDomain.evidence,
+            itemDomain.kind,
+          );
+        }
+      }
     }
   }
   const csam = metadataVerdict({
@@ -1604,7 +1619,9 @@ export async function assertSafeMedia(url: string, result?: ExtractResult) {
   });
   if (csam?.block) {
     throw new MediaBlockedError(
-      "هذا المحتوى محظور (حماية القُصّر).",
+      csam.kind === "csam"
+        ? "هذا المحتوى محظور (حماية القُصّر)."
+        : userBlockMessage(csam.kind) || "هذا المحتوى محظور.",
       csam.evidence,
       csam.kind,
     );

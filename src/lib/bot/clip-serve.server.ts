@@ -1,7 +1,7 @@
 import { consumeClip, getClipLink } from "./store.server";
 import { clipDeniedReason, isClipId } from "./clip-id";
 import { isHostedMediaCdn, mediaHeaders } from "../media/http";
-import { assertSafeOutboundUrl } from "../media/ssrf";
+import { assertSafeOutboundUrl, safeFetch, SsrfError } from "../media/ssrf";
 
 export const CLIP_NOT_FOUND_BODY = "Not Found";
 
@@ -76,7 +76,14 @@ async function proxySourceMedia(url: string, request: Request): Promise<Response
   if (!isHostedMediaCdn(url)) return clipNotFoundResponse();
   const range = request.headers.get("range");
   const extra = range ? { Range: range } : undefined;
-  const res = await fetch(url, { headers: mediaHeaders(extra, url) });
+  let res: Response;
+  try {
+    // safeFetch re-validates every redirect hop (SSRF) — plain fetch does not.
+    res = await safeFetch(url, { headers: mediaHeaders(extra, url), maxRedirects: 3, timeoutMs: 20000 });
+  } catch (err) {
+    if (err instanceof SsrfError) return clipNotFoundResponse();
+    return clipNotFoundResponse();
+  }
   if (!res.ok && res.status !== 206) return clipNotFoundResponse();
   const out = new Headers();
   out.set("Content-Type", res.headers.get("content-type") || "video/mp4");
