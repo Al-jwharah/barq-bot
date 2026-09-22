@@ -1,8 +1,8 @@
 /**
- * B4 Weekly leaderboard — built behind BARQ_LEADERBOARD_LIVE (default OFF).
+ * Weekly leaderboard — gated by BARQ_LEADERBOARD_LIVE (default OFF).
  * Do not enable for production until Squad C reports 48h no new failures.
+ * Prefer real Postgres query when live; demo rows when gated (website UX).
  */
-
 import { getSql } from "@/lib/db";
 import { LEADERBOARD_LIVE } from "./config.server";
 import { leaderboardGatedMessage } from "./engagement";
@@ -15,6 +15,16 @@ export type LeaderboardRow = {
 
 export function leaderboardLive(): boolean {
   return LEADERBOARD_LIVE;
+}
+
+export { leaderboardGatedMessage };
+
+export function demoLeaderboardRows(): LeaderboardRow[] {
+  return [
+    { tg_id: "demo0001", downloads: 42, rank: 1 },
+    { tg_id: "demo0002", downloads: 31, rank: 2 },
+    { tg_id: "demo0003", downloads: 18, rank: 3 },
+  ];
 }
 
 export async function weeklyLeaderboard(limit = 10): Promise<LeaderboardRow[]> {
@@ -52,11 +62,17 @@ export async function leaderboardPayload(limit = 10): Promise<{
   live: boolean;
   rows: LeaderboardRow[];
   message: string;
+  demo: boolean;
 }> {
   const live = leaderboardLive();
   if (!live) {
-    return { live: false, rows: [], message: leaderboardGatedMessage() };
+    return {
+      live: false,
+      rows: demoLeaderboardRows(),
+      message: leaderboardGatedMessage(),
+      demo: true,
+    };
   }
   const rows = await weeklyLeaderboard(limit);
-  return { live: true, rows, message: formatLeaderboard(rows, true) };
+  return { live: true, rows, message: formatLeaderboard(rows, true), demo: false };
 }
