@@ -132,6 +132,13 @@ import { postDeliveryAiRows, postDeliveryCaption, captionMenuRows } from "./ai/p
 import { parseCaptionCallback } from "./ai/captions";
 import { SUBTITLES_TOGGLE_CALLBACK } from "./ai/subtitles";
 import { helpCaption, publicStartCaption, shortLinkBlobDownAr, shortLinkNeedMediaAr } from "./copy";
+import {
+  blobUploadReady,
+  SHORT_LINK_HIDDEN_AR,
+  SHORT_LINK_OK_HINT_AR,
+  markBlobSuspended,
+  isBlobStoreUnavailable,
+} from "./blob-status.server";
 import { handleUpload } from "./handlers/upload.handler";
 import {
   handleAnalyze,
@@ -1403,12 +1410,19 @@ async function handleCallback(cb: TgCallbackQuery) {
   }
   if (data === "go:short") {
     await telegram.answerCallback(cb.id);
+    const clip = lastClip(fromId);
+    if (clip?.mediaUrl) {
+      await sendShortLink(targetChat, fromId);
+      return;
+    }
+    if (!blobUploadReady()) {
+      await telegram.sendMessage(targetChat, SHORT_LINK_HIDDEN_AR, {
+        reply_markup: await keysFor(fromId, member),
+      });
+      return;
+    }
     setAwait(fromId, "hostfile");
-    await telegram.sendMessage(
-      targetChat,
-      "أرسل الآن الصورة أو الفيديو أو المجلد المضغوط أو تطبيق آبل.\nرابط مباشر لمدة 24 ساعة.",
-    );
-    await sendShortLink(targetChat, fromId);
+    await telegram.sendMessage(targetChat, SHORT_LINK_OK_HINT_AR);
     return;
   }
   if (data.startsWith("cd:")) {
@@ -1534,9 +1548,9 @@ export async function sendAfterDownload(chatId: number, fromId?: number) {
   const { shareTargets } = await import("./product.server");
   const url = clip?.url || `https://t.me/${BOT_USERNAME}`;
   const s = shareTargets(url, clip?.title);
-  const rows = postDeliveryAiRows(clip, s.telegram);
+  const rows = postDeliveryAiRows(clip, s.telegram, { shortLinks: blobUploadReady(, { shortLinks: shortLinksAdvertised() }), aiReady: AI_ENABLED && grokReady() });
   await swallowSideEffect(() =>
-    telegram.sendMessage(chatId, postDeliveryCaption(AI_ENABLED), {
+    telegram.sendMessage(chatId, postDeliveryCaption(aiReady), {
       reply_markup: inlineKeyboard(rows),
     }),
   );
@@ -1559,10 +1573,11 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
 }
 
 async function sendSourceLine(chatId: number, result: ExtractResult) {
+  const sourceRows = shortLinksAdvertised()
+    ? [[{ text: SHORT_LINK_BTN, callback_data: "go:short" }]]
+    : [];
   await telegram.sendMessage(chatId, `متصل من: ${platformLabelAr(result.platform)}`, {
-    reply_markup: inlineKeyboard([
-      [{ text: SHORT_LINK_BTN, callback_data: "go:short" }],
-    ]),
+    reply_markup: sourceRows.length ? inlineKeyboard(sourceRows) : undefined,
   });
 }
 
@@ -1599,21 +1614,19 @@ async function sendShortLink(chatId: number, fromId: number) {
         reply_markup: inlineKeyboard([[{ text: "فتح الرابط", url: short }]]),
       },
     );
-  } catch {
+  } catch (err) {
+    if (isBlobStoreUnavailable(err)) markBlobSuspended();
     if (clip.mediaUrl) {
       await telegram.sendMessage(
         chatId,
-        shortLinkBlobDownAr() + (clip.mediaUrl ? "\nهذا رابط مباشر للمقطع:" : ""),
+        shortLinkBlobDownAr() + "\nهذا رابط مباشر للمقطع:",
         {
           reply_markup: inlineKeyboard([[{ text: "فتح المقطع", url: clip.mediaUrl }]]),
         },
       );
       return;
     }
-    await telegram.sendMessage(
-      chatId,
-      shortLinkBlobDownAr(),
-    );
+    await telegram.sendMessage(chatId, shortLinkBlobDownAr());
   }
 }
 
@@ -2509,14 +2522,21 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
   if (isShortCommand(text)) {
-    setAwait(fromId, "hostfile");
-    await telegram.sendMessage(
-      chatId,
-      "أرسل الآن الصورة أو الفيديو أو المجلد المضغوط أو تطبيق آبل.\nأصدر لك رابط مباشر لمدة 24 ساعة (حد 20 ميغابايت).",
-      { reply_markup: await keysFor(fromId, member) },
-    );
     const clip = lastClip(fromId);
-    if (clip?.mediaUrl) await sendShortLink(chatId, fromId);
+    if (clip?.mediaUrl) {
+      await sendShortLink(chatId, fromId);
+      return;
+    }
+    if (!blobUploadReady()) {
+      await telegram.sendMessage(chatId, SHORT_LINK_HIDDEN_AR, {
+        reply_markup: await keysFor(fromId, member),
+      });
+      return;
+    }
+    setAwait(fromId, "hostfile");
+    await telegram.sendMessage(chatId, SHORT_LINK_OK_HINT_AR, {
+      reply_markup: await keysFor(fromId, member),
+    });
     return;
   }
   if (text === AD_BTN || text.startsWith("/ad")) {

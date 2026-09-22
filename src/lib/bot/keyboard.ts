@@ -4,8 +4,9 @@ import { getMember, type Member } from "./store.server";
 import { isOwnerId } from "./config.server";
 import { replyKeyboard } from "./telegram.server";
 import { SHORT_LINK_BTN } from "./short-intent";
+import { shortLinksAdvertised } from "./blob-status.server";
 
-export const AD_BTN = "مشاهدة إعلان لتجديد 5 فيديوهات";
+export const AD_BTN = "مشاهدة إعلان لتجديد 10 فيديوهات";
 export const SUPPORT_BTN = "دعم فني";
 
 export const OWNER_ONLY_LABELS = new Set([
@@ -25,24 +26,28 @@ export const OWNER_ONLY_LABELS = new Set([
   "اسحب فائز",
 ]);
 
-export const SUB_KEYBOARD = replyKeyboard([
-  [SHORT_LINK_BTN, "حالة الاشتراك"],
-  ["كيف يعمل", SUPPORT_BTN],
-]);
+export function subKeyboard() {
+  const top = shortLinksAdvertised()
+    ? [SHORT_LINK_BTN, "حالة الاشتراك"]
+    : ["حالة الاشتراك"];
+  return replyKeyboard([top, ["كيف يعمل", SUPPORT_BTN]]);
+}
+
+export const SUB_KEYBOARD = subKeyboard();
 
 /** First-contact keyboard: paste-link UX, no points/journey wall of buttons. */
 export const FREE_KEYBOARD = replyKeyboard([["كيف يعمل", SUPPORT_BTN]]);
 
 /** Unlocked after first successful download — points / journey / achievements. */
-export const FREE_KEYBOARD_FULL = replyKeyboard([
-  [SHORT_LINK_BTN, "سجلي"],
-  ["حدّي", "برق AI"],
-  ["رحلتي", "إنجازاتي"],
-  ["أعجبني", "حسابي"],
-  ["نقاطي", "كيف يعمل"],
-]);
+export function freeKeyboardFull() {
+  const rows: string[][] = [];
+  if (shortLinksAdvertised()) rows.push([SHORT_LINK_BTN, "سجلي"]);
+  else rows.push(["سجلي"]);
+  rows.push(["حدّي", "برق AI"], ["رحلتي", "إنجازاتي"], ["أعجبني", "حسابي"], ["نقاطي", "كيف يعمل"]);
+  return replyKeyboard(rows);
+}
 
-/** Hint labels mentioned in /start; quality/audio are inline after a link. */
+export const FREE_KEYBOARD_FULL = freeKeyboardFull();
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";
 
@@ -54,7 +59,7 @@ export function roleOf(fromId: number, member?: Member | null): UserRole {
 }
 
 export function freeKeyboardFor(member?: Member | null) {
-  if ((member?.downloads_used ?? 0) > 0) return FREE_KEYBOARD_FULL;
+  if ((member?.downloads_used ?? 0) > 0) return freeKeyboardFull();
   return FREE_KEYBOARD;
 }
 
