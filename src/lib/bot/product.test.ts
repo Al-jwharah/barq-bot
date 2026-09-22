@@ -49,7 +49,7 @@ test("preview caption includes duration or size placeholder", () => {
     title: "تجربة",
     items: [{ kind: "video", url: "https://cdn.example/a.mp4", duration: 12, variants: [{ url: "https://cdn.example/a.mp4", quality: "720p", size: 8_000_000, contentType: "video/mp4" }] }],
   });
-  assert.match(text, /أعلى جودة/);
+  assert.match(text, /الإرسال|جودة|جاري/);
   assert.match(text, /12ث/);
   assert.doesNotMatch(text, /تجربة/);
 });

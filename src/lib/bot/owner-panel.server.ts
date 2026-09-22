@@ -828,7 +828,7 @@ export async function sendWatch(chatId: number, _fromId: number) {
     ? blocked
         .map((row) => `• ${row.kind} · ${(row.evidence ?? row.reason ?? "").slice(0, 80)}`)
         .join("\n")
-    : "لا حجب إباحي مسجّل.";
+    : "لا حجب مسجّل.";
   await telegram.sendMessage(
     chatId,
     `مراقبة برق\nأعضاء ${stats.members} · تحميلات ${stats.downloads} · حجب ${stats.blocked} · فشل ${stats.failed}\nجروك: ${grokReady() ? grokModelLabel(s.grokModel) : "غير متصل"}\n\nآخر التحميلات:\n${logLines}\n\nالحجب:\n${blockLines}`,

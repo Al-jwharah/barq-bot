@@ -8,8 +8,11 @@ import {
   blocksBannedJob,
   decideHostfile,
   hostfileYieldsToDownload,
+  MULTI_LINK_CAP,
+  multiLinkStatusText,
   parseJobCancelId,
   parseJobRetryId,
+  selectDownloadUrls,
   swallowSideEffect,
 } from "./handle-guards.ts";
 
@@ -87,4 +90,34 @@ test("handle.server.ts wires guards without a DB-only cancel", () => {
   assert.ok(urlFirst < grok, "video URLs must download before grok mode");
   assert.equal(src.includes("transitionJob"), false);
   assert.match(src, /killJobProcess|cancelJob/);
+});
+
+test("multi-link select caps at 3 and status never silent", () => {
+  const urls = [
+    "https://tiktok.com/a",
+    "https://tiktok.com/b",
+    "https://tiktok.com/c",
+    "https://tiktok.com/d",
+    "https://tiktok.com/a",
+  ];
+  const picked = selectDownloadUrls(urls);
+  assert.equal(MULTI_LINK_CAP, 3);
+  assert.equal(picked.total, 4);
+  assert.equal(picked.truncated, true);
+  assert.deepEqual(picked.batch, urls.slice(0, 3));
+  assert.equal(multiLinkStatusText(1), null);
+  assert.match(multiLinkStatusText(2)!, /2 روابط/);
+  assert.match(multiLinkStatusText(4)!, /أول 3/);
+});
+
+test("handle.server enqueues multi-link helper and quality picker stays wired", () => {
+  const handle = readFileSync(new URL("./handle.server.ts", import.meta.url), "utf8");
+  assert.match(handle, /enqueueMessageUrls/);
+  assert.match(handle, /selectDownloadUrls/);
+  assert.match(handle, /sendQualityPicker/);
+  assert.match(handle, /offerAudioOnly/);
+  assert.match(handle, /fulfillQualityPick/);
+  const worker = readFileSync(new URL("../jobs/worker.server.ts", import.meta.url), "utf8");
+  assert.match(worker, /sendQualityPicker/);
+  assert.match(worker, /offerAudioOnly/);
 });

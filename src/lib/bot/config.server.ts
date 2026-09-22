@@ -46,8 +46,8 @@ export const BOT_USERNAME = env("BARQ_BOT_USERNAME") ?? "barq_ibot";
 export const BOT_DISPLAY_NAME = "برق ⚡️ لتحميل الفيديوهات";
 export const BOT_BRAND = "برق";
 export const BOT_DESCRIPTION =
-  "برق ⚡️ الصق الرابط واستلم الفيديو.\nتيك توك · إنستغرام · إكس · يوتيوب\nجبت كنتاكي؟ تعال حمّل 😂🍗\n\nالدعم @i_2169 · البريد info@aljwharah.ai";
-export const BOT_SHORT = "برق ⚡️ الصق الرابط. الفيديو عندك. الكنتاكي بعدك 🍗";
+  "برق ⚡️ الصق الرابط واستلم الفيديو.\nيوتيوب · تيك توك · إنستغرام · إكس · فيسبوك\nبعد الرابط: جودة أو صوت فقط عند التوفر.\n\nالدعم @i_2169 · البريد info@aljwharah.ai";
+export const BOT_SHORT = "برق ⚡️ الصق الرابط ← الفيديو عندك";
 
 export const TELEGRAM_MAX_UPLOAD = 49 * 1024 * 1024;
 export const TELEGRAM_MAX_URL = 19 * 1024 * 1024;
@@ -68,7 +68,8 @@ export const SUBSCRIPTIONS_LIVE = envFlag("BARQ_SUBSCRIPTIONS_LIVE", false);
 export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 5) || 5;
 export const DAILY_CAP_ON = envFlag("BARQ_DAILY_CAP_ON", true);
 export const MAINTENANCE = envFlag("BARQ_MAINTENANCE", false);
-export const LAUNCH_MAX = Number(env("BARQ_LAUNCH_MAX") ?? 100) || 100;
+/** Soft public beta seat gate. Default 500 for soft beta; raise via BARQ_LAUNCH_MAX on Vercel (e.g. 1000+) when opening wider. Do not flip Vercel secrets from this repo — set env in the dashboard. Code default applies only when the env var is unset. */
+export const LAUNCH_MAX = Number(env("BARQ_LAUNCH_MAX") ?? 500) || 500;
 export const MAINTENANCE_TEXT = `نعتذر عن البداية السيئة ⚡️
 
 البوت تحت التطوير، وسيعود للعمل بشكل جديد قريبًا.`;

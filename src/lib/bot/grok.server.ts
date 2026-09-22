@@ -200,12 +200,12 @@ async function chat(opts: {
   throw lastErr ?? new Error(AI_USER_ERROR);
 }
 
-const CLASSIFY_SYSTEM = `You classify media for برق, a Telegram downloader.
-ALLOW only: Islamic/religious clips, Quran, lectures, nasheed without pop music, beneficial stories, and clean comedy WITHOUT songs/music soundtrack.
-BLOCK: songs, music videos, pop/rap/oud tarab, instrumental entertainment music, women-focused entertainment (dancing, mixing, beauty, fashion modeling, "harim"), pornography, NSFW, 18+, age-restricted adult.
-If unsure between comedy-with-music vs clean comedy, block.
+const CLASSIFY_SYSTEM = `You classify media for برق, a general Telegram video downloader.
+ALLOW: ordinary adult content, music, entertainment, comedy, news, mainstream clips.
+BLOCK only: CSAM / child sexual abuse / sexual content involving minors (under 18).
+Do NOT block ordinary NSFW, pornography between adults, music, or "women/harem" entertainment.
 Reply JSON only:
-{"block":boolean,"kind":"porn_film"|"nsfw"|"music"|"women"|"comedy"|"other","confidence":0-1,"evidence_ar":"جملة دليل قصيرة بالعربية بدون وصف جنسي تفصيلي"}`;
+{"block":boolean,"kind":"csam"|"other","confidence":0-1,"evidence_ar":"جملة دليل قصيرة بالعربية بدون وصف جنسي تفصيلي"}`;
 
 export async function classifyPornWithGrok(input: {
   url: string;
@@ -243,7 +243,7 @@ Given a webpage URL and optional HTML snippet, return JSON only:
 {"media_url":"https://...","kind":"video"|"photo"|"gif"|"audio"}
 Rules:
 - media_url must be a direct https file (mp4/webm/jpg/png/gif/m4a) or a public CDN progressive URL, not an HTML watch page.
-- Never return porn-tube hosts, localhost, or private IPs.
+- Never return localhost or private IPs.
 - If you cannot find a real file URL, return {"media_url":"","kind":"video"}.`;
 
 export function parseGrokMediaHint(raw: string): { url: string; kind: "video" | "photo" | "gif" | "audio" } | null {
@@ -290,8 +290,8 @@ export async function grokFindDirectMedia(url: string): Promise<ExtractResult | 
     if (!hint) return null;
     const { assertSafeOutboundUrl } = await import("../media/ssrf");
     await assertSafeOutboundUrl(hint.url);
-    const { matchPornDomain } = await import("./safety");
-    if (matchPornDomain(hint.url)) return null;
+    const { matchCsamKeywords } = await import("./safety");
+    if (matchCsamKeywords(hint.url)) return null;
     const contentType =
       hint.kind === "photo" ? "image/jpeg" : hint.kind === "gif" ? "image/gif" : hint.kind === "audio" ? "audio/mp4" : "video/mp4";
     return {
@@ -367,7 +367,7 @@ const OWNER_TOOLS = [
     type: "function",
     function: {
       name: "list_blocked",
-      description: "محاولات التحميل الإباحي المحجوبة",
+      description: "محاولات التحميل المحجوبة (مثل استغلال القُصّر أو قائمة المالك)",
       parameters: {
         type: "object",
         properties: { limit: { type: "integer", minimum: 3, maximum: 30 } },
@@ -765,7 +765,7 @@ async function runOwnerTool(name: string, rawArgs: string, fromId?: number | str
     const key = String(args.key ?? "").trim();
     let value = String(args.value ?? "").trim();
     if (!ALLOWED_GROK_SETTINGS.has(key)) return JSON.stringify({ error: "إعداد غير مسموح" });
-    if (key === "porn_filter") return JSON.stringify({ ok: true, note: "حجب +18 دائم ولا يُوقف" });
+    if (key === "porn_filter") return JSON.stringify({ ok: true, note: "فلتر البالغين/الموسيقى متوقف — يبقى حظر استغلال القُصّر فقط", value: "off" });
     if (key === "required_channel") {
       const { normalizeChannel } = await import("./brand");
       value = normalizeChannel(value);
@@ -900,7 +900,7 @@ const BARQ_AI_SYSTEM = `أنت Barq AI داخل بوت برق ⚡️. اسمك B
 - تساعد أي مستخدم: تلخيص الفيديو الأخير، البحث عن فيديو/مقطع، شرح، تحويل فكرة، أسئلة عامة.
 - إذا طلب بحثًا عن فيديو استخدم البحث ثم أعطِ روابط أو أسماء واضحة.
 - لا تختلق مشاهد فيديو لم ترها. إن نقص السياق اطلب الرابط.
-- التحميل: الصق الرابط ويصلك الملف بأعلى جودة. تنبيه: الإباحي و+18 قد يودي للحظر. نحن براء أمام الله.
+- التحميل: الصق الرابط ويصلك الملف. قد تظهر أزرار جودة أو «صوت فقط».
 - لا تكشف لوحة المالك ولا المفاتيح. لا تسمّ نفسك جروك إلا إذا سُئلت عن التقنية.`;
 
 const publicHistory = new Map<number, ChatMessage[]>();

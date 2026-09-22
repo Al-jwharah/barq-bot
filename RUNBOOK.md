@@ -63,11 +63,13 @@ Keep `snapshot.json` off git and out of chat logs.
 
 **AR:** يتطلب جلسة إدارة (`hasAdminSession`). الجسم: `{ "confirm": "RESTORE" | "TEST", "snapshot": { ... } }`.  
 `TEST` = فحص الشكل فقط (حدث `restore_test_completed`، بلا كتابة).  
-`RESTORE` = تطبيق `restoreBackup` (upsert إعدادات/أعضاء/عدادات — لا يمسح الجداول).
+`RESTORE` = تطبيق `restoreBackup` (upsert إعدادات/أعضاء/أكواد/عدادات/حظر/تذاكر/مقاطع/وظائف — لا يمسح الجداول؛ الوظائف النشطة تُلغى).
 
 **EN:** Requires an admin session (`hasAdminSession`). Body: `{ "confirm": "RESTORE" | "TEST", "snapshot": { ... } }`.  
 `TEST` = shape check only (`restore_test_completed`, no writes).  
-`RESTORE` = apply `restoreBackup` (upsert settings/members/usage — does not wipe tables).
+`RESTORE` = apply `restoreBackup` (upsert settings/members/promo_codes/usage/bans/tickets/clips/jobs — does not wipe tables; active jobs coerced to cancelled).
+
+Safe second-DB dry-run: `npm run restore:dry-run` (uses `RESTORE_DATABASE_URL` if set; never production `DATABASE_URL`). See `RESTORE_PROOF.md`.
 
 ```bash
 # dry-run
@@ -161,7 +163,7 @@ Code never hardcodes the host. Only the env var does.
 
 **AR:** العامل ليس على VPS. التحميل يُصفّ في `download_jobs` ويُنفَّذ عبر `POST /api/jobs` على Vercel (`x-barq-job` = `BARQ_JOB_SECRET`). النداء الداخلي يستخدم `VERCEL_URL` لا النطاق العام. `/api/keep` يفرّغ الانتظار يوميًا.
 
-**EN:** There is no VPS worker yet. Downloads enqueue into `download_jobs` and run via `POST /api/jobs` on Vercel (`x-barq-job` = `BARQ_JOB_SECRET`). The internal kick uses `VERCEL_URL`, not the public origin. `/api/keep` drains the queue on a daily cron.
+**EN:** There is no VPS worker yet. Downloads enqueue into `download_jobs` and run via `POST /api/jobs` on Vercel (`x-barq-job` = `BARQ_JOB_SECRET`). The internal kick uses `VERCEL_URL`, not the public origin. `/api/keep` drains daily (Hobby cron limit); webhook reclaim + `/api/jobs` self-kick drain deep queues between crons.
 
 ```bash
 curl -sS -X POST "$BARQ_PUBLIC_ORIGIN/api/jobs" \
@@ -221,6 +223,13 @@ JSON logs (`logJson`): `requestId`, `jobId`, `userId`, `event`, `durationMs`, `s
 
 Vercel cron: `GET /api/keep` at `0 4 * * *` (`vercel.json`). That path drains jobs and calls `runCleanup()`.
 
+**Hobby plan lock:** Vercel Hobby only allows **daily** cron schedules. Sub-daily expressions (hourly / every N minutes) fail deploy. Do **not** raise the keep cron frequency while on Hobby. Queue reliability instead comes from:
+1. Telegram webhook → `reclaimStuckJobs` + `drainJobs`
+2. `/api/jobs` self-kick while `pending > 0`
+3. Daily `/api/keep` reclaim + drain as a backstop
+
+On Pro, `*/5 * * * *` (or similar) for `/api/keep` is allowed. A **dedicated always-on worker** is still recommended before public launch.
+
 Flags (defaults):
 
 ```
@@ -246,3 +255,28 @@ If the bot cannot post, the text is saved as `pending_news_text` and the owner g
 - Never log snapshot JSON (`detail` = counts / mode only).
 - Never put the admin PIN in query strings (`?pin=` is obsolete; use `/admin` session).
 - Never switch `BARQ_PUBLIC_ORIGIN` off `https://barq.abdulrhman.ai` until apex SSL is proven.
+
+
+---
+
+## CRON_SECRET + BARQ_JOB_SECRET (keep/jobs auth)
+
+Vercel Cron sends `Authorization: Bearer $CRON_SECRET` when `CRON_SECRET` is set.
+
+`/api/keep` and `/api/jobs` accept:
+- `x-barq-job: $BARQ_JOB_SECRET`
+- `?secret=` / JSON `{secret}`
+- `Authorization: Bearer` matching **either** `BARQ_JOB_SECRET` **or** `CRON_SECRET`
+
+**Ops:** set both env vars in Vercel Production (same value is fine). Unauthenticated GET returns `{ok:true}` only (no drain, no stats).
+
+**Hobby:** do not change `vercel.json` cron below daily. Deep queues rely on webhook reclaim/drain + `/api/jobs` self-kick.
+
+**Pro team `abdulrhman-app`:** no barq project found (2026-09-22). Do not migrate cron frequency or project host without evidence.
+
+
+## Soft public beta
+
+- `BARQ_TEMP_FREE=on` (default): paste-link UX, no paywall pressure, no maintenance apology on `/start`.
+- `BARQ_LAUNCH_MAX` default 500 (code). Raise in Vercel dashboard for wider beta.
+- `BARQ_MAINTENANCE=off` when serving users.

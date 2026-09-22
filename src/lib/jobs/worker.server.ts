@@ -6,8 +6,10 @@ import {
   assertSafeMedia,
   deliver,
   handleBlocked,
+  offerAudioOnly,
   sendAfterDownload,
   sendPlayCard,
+  sendQualityPicker,
 } from "../bot/handle.server";
 import { MediaBlockedError } from "../bot/safety";
 import { logEvent, requestId } from "../bot/observability.server";
@@ -98,7 +100,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   const chatId = Number(job.chat_id);
   const fromId = Number(job.tg_id);
   const mid = job.status_message_id;
-  await editStatus(chatId, mid, "🔍 فحص الأمان…");
+  await editStatus(chatId, mid, "🔍 فحص الرابط…");
   const { looksLikeLiveStream, progressStatus, cachedExtract, saveExtractCache, recordDeadLink } = await import("../bot/product.server");
   if (looksLikeLiveStream(job.url)) {
     throw new Error("هذا بث مباشر. أرسل المقطع بعد انتهائه، أو كليب جاهز.");
@@ -129,12 +131,37 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   let result = (await cachedExtract(job.url).catch(() => null)) ?? (await extractMedia(job.url));
   await saveExtractCache(job.url, result).catch(() => undefined);
   await assertSafeMedia(job.url, result);
-  const member = await getMember(fromId);
-  const quota = member ? await downloadAccess(member) : { subscribed: false };
-  const stamp = !isOwnerId(fromId) && !quota.subscribed;
+  // Parallel stamp + cancel check so quality/MP3 buttons show ASAP after extract.
+  const stampTask = (async () => {
+    if (isOwnerId(fromId)) return false;
+    const member = await getMember(fromId);
+    const quota = member ? await downloadAccess(member) : { subscribed: false };
+    return !quota.subscribed;
+  })();
   await editStatus(chatId, mid, progressStatus("preview"));
-  const live = await getJob(job.id);
+  const [stamp, live] = await Promise.all([stampTask, getJob(job.id)]);
   if (live?.status === "cancelled") throw new Error("cancelled");
+
+  const picked = await sendQualityPicker(chatId, fromId, result, stamp).catch(() => false);
+  if (picked) {
+    if (await applyJobQuota(job.id)) {
+      await bumpDownload(fromId);
+      const { bumpDownloadOk } = await import("../bot/growth.server");
+      await bumpDownloadOk(fromId).catch(() => undefined);
+      emit("download.completed", { tgId: fromId, url: job.url });
+    }
+    await logDownload({
+      tgId: fromId,
+      url: job.url,
+      platform: result.platform,
+      ok: true,
+      title: result.title ?? result.text,
+    }).catch(() => undefined);
+    markProcessed();
+    if (mid) await telegram.deleteMessage(chatId, mid).catch(() => undefined);
+    return "ok";
+  }
+
   await markJobUploading(job.id).catch(() => undefined);
   await editStatus(chatId, mid, progressStatus("upload"));
   let ids: number[] = [];
@@ -160,6 +187,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     },
   }).catch(() => undefined);
   await sendPlayCard(chatId, fromId, result).catch(() => undefined);
+  await offerAudioOnly(chatId, fromId, result, stamp).catch(() => undefined);
   if (await applyJobQuota(job.id)) {
     await bumpDownload(fromId);
     const { bumpDownloadOk } = await import("../bot/growth.server");
@@ -300,10 +328,25 @@ export async function drainJobs(max?: number) {
     const { jobStats } = await import("./queue.server");
     pending = (await jobStats()).pending;
   } catch {
-    pending = 3;
+    pending = 1;
   }
   const auto = workersForLoad(pending, cap);
   const requested = max != null && Number.isFinite(max) && max > 0 ? Math.trunc(max) : auto;
+  // Hard ceiling 8: allow keep(8) / jobs(~5); pool max≈4 + 503 on exhaustion.
   const limit = Math.max(1, Math.min(8, requested));
-  return Promise.all(Array.from({ length: limit }, () => processDownloadJob()));
+  const { isDbOverloadError } = await import("@/lib/db");
+  const settled = await Promise.allSettled(Array.from({ length: limit }, () => processDownloadJob()));
+  const results = [];
+  for (const s of settled) {
+    if (s.status === "fulfilled") {
+      results.push(s.value);
+      continue;
+    }
+    if (isDbOverloadError(s.reason)) throw s.reason;
+    results.push({
+      status: "error" as const,
+      error: s.reason instanceof Error ? s.reason.message.slice(0, 80) : "drain",
+    });
+  }
+  return results;
 }

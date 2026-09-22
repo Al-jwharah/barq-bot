@@ -40,10 +40,20 @@ export const Route = createFileRoute("/api/telegram")({
         // Await enqueue so a missing waitUntil context cannot drop the update.
         // Then drain: waitUntil when the Vercel context exists, otherwise await.
         await handleUpdate(guarded.update).catch(() => undefined);
+        // Hobby cron for /api/keep is daily-only. Drain first for snappy single-user path,
+        // then reclaim (cooldown-guarded) so stuck rows do not block the new job.
+        // Deep queues continue via /api/jobs self-kick.
+        // Dedicated always-on worker still recommended for launch.
         await later(
           (async () => {
             const { drainJobs } = await import("@/lib/jobs/worker.server");
-            await drainJobs();
+            await drainJobs(3);
+            const { reclaimStuckJobs, jobStats, kickJobWorker } = await import("@/lib/jobs/queue.server");
+            await reclaimStuckJobs().catch(() => undefined);
+            const stats = await jobStats().catch(() => null);
+            if (stats && stats.pending > 0) {
+              await kickJobWorker().catch(() => undefined);
+            }
           })().finally(() => flushDb().catch(() => undefined)),
         );
         return new Response("ok");

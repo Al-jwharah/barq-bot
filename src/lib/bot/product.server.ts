@@ -14,14 +14,14 @@ export function stageProgress(stage: "safe" | "extract" | "preview" | "upload" |
     bar: `${"█".repeat(filled)}${"░".repeat(width - filled)}`,
     label:
       stage === "safe"
-        ? "فحص الأمان"
+        ? "فحص الرابط"
         : stage === "extract"
-          ? "تجهيز الملف"
+          ? "استخراج الفيديو…"
           : stage === "preview"
-            ? "معاينة"
+            ? "تنزيل الملف…"
             : stage === "upload"
-              ? "رفع لتليجرام"
-              : "تم",
+              ? "رفع لتليجرام…"
+              : "تم ⚡️",
   };
 }
 
@@ -323,7 +323,7 @@ export function previewCaption(result: ExtractResult): string {
   const dur = item?.duration ? `${Math.round(item.duration)}ث` : "";
   const sizes = (item?.variants ?? []).map((v) => v.size).filter((n): n is number => typeof n === "number" && n > 0);
   const mb = sizes.length ? `${Math.round(Math.min(...sizes) / (1024 * 1024))}–${Math.round(Math.max(...sizes) / (1024 * 1024))}MB` : "";
-  return ["جاري إرسال أعلى جودة", [dur, mb].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
+  return ["جاري الإرسال…", [dur, mb].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
 }
 
 export function queueEta(position: number): string {

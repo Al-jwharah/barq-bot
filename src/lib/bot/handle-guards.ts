@@ -78,3 +78,32 @@ export async function swallowSideEffect<T>(fn: () => Promise<T>): Promise<T | nu
     return null;
   }
 }
+
+/** Cap concurrent URLs from one Telegram message (never silent-drop extras). */
+export const MULTI_LINK_CAP = 3;
+
+export function selectDownloadUrls(
+  urls: string[],
+  cap = MULTI_LINK_CAP,
+): { batch: string[]; total: number; truncated: boolean } {
+  const unique: string[] = [];
+  for (const u of urls) {
+    const t = String(u ?? "").trim();
+    if (!t || unique.includes(t)) continue;
+    unique.push(t);
+  }
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.trunc(cap) : MULTI_LINK_CAP;
+  return {
+    batch: unique.slice(0, limit),
+    total: unique.length,
+    truncated: unique.length > limit,
+  };
+}
+
+/** Arabic status when the user pasted more than one link. */
+export function multiLinkStatusText(total: number, cap = MULTI_LINK_CAP): string | null {
+  if (total <= 1) return null;
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.trunc(cap) : MULTI_LINK_CAP;
+  const skipped = total > limit ? `\nأخذت أول ${limit} فقط.` : "";
+  return `لقيت ${total} روابط — أحملها بالترتيب ⚡️${skipped}`;
+}

@@ -9,7 +9,17 @@ export async function runDailyBackup(): Promise<boolean> {
   const token = typeof process !== "undefined" ? process.env.BLOB_READ_WRITE_TOKEN?.trim() : "";
   if (token) {
     const { put } = await import("@vercel/blob");
-    const body = JSON.stringify({ at: snap.at, members: snap.members.length, codes: snap.codes.length });
+    const body = JSON.stringify({
+      at: snap.at,
+      members: snap.members.length,
+      codes: snap.codes.length,
+      usage: snap.usage.length,
+      bans: snap.bans.length,
+      tickets: snap.tickets.length,
+      clips: snap.clips.length,
+      jobs: snap.jobs.length,
+      settings: Object.keys(snap.settings).length,
+    });
     await put(`backups/barq-${new Date().toISOString().slice(0, 10)}.json`, body, {
       access: "private",
       token,
@@ -19,7 +29,7 @@ export async function runDailyBackup(): Promise<boolean> {
   await logEvent({
     action: "backup_daily",
     status: "ok",
-    detail: `members=${snap.members.length} codes=${snap.codes.length}`,
+    detail: `members=${snap.members.length} codes=${snap.codes.length} bans=${snap.bans.length} tickets=${snap.tickets.length} clips=${snap.clips.length} jobs=${snap.jobs.length}`,
   }).catch(() => undefined);
   await logJson({ event: "backup_daily", status: "ok" }).catch(() => undefined);
   return true;

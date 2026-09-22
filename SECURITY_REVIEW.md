@@ -68,7 +68,7 @@ PIN عبر **scrypt** (`hashPin` / `verifyPin`)، مقارنة `timingSafeEqual`
 | شهادة apex SSL | النطاق العامل: `https://barq.abdulrhman.ai`. **SSL cutover NOT done.** لا تنتقل إلى apex حتى يثبت HTTPS. |
 | PGlite إن غاب Postgres | بدون `DATABASE_URL` ومع العلم مطفأ، الحالة داخل Lambda + dump على Blob. خطر فقدان/سباق cold start. PGlite **لم يُحذف** (معاينة محلية). |
 | حدود المعدل في الذاكرة | عند فشل SQL: fallback Map — لا يتشارك عبر instances. |
-| لقطة النسخ الاحتياطي ناقصة | `restoreBackup` لا يعيد `promo_codes` ولا الوظائف/الحظر/التذاكر/المقاطع. |
+| لقطة النسخ الاحتياطي | Upsert يعيد promo_codes/bans/tickets/clips/jobs metadata — بروفة قاعدة ثانية ما زالت NOT PROVEN (`RESTORE_PROOF.md`). |
 
 ---
 

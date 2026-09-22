@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { waitUntil } from "@vercel/functions";
 import { OWNER_TG_ID, TELEGRAM_BOT_TOKEN } from "@/lib/bot/config.server";
-import { secretsMatch } from "@/lib/bot/webhook-guard";
+import { authorizeJobRequest, legacyKeepProbeSecret } from "@/lib/bot/job-auth";
 import { grokReady } from "@/lib/bot/grok.server";
 import { telegram } from "@/lib/bot/telegram.server";
 import { setSetting } from "@/lib/bot/store.server";
@@ -48,12 +48,29 @@ async function probePauseSend() {
   return { probe: "ok", grok: grokReady(), token: Boolean(TELEGRAM_BOT_TOKEN), paused: false };
 }
 
+/** Keep backstop: reclaim then drain up to 8 (matches jobs route ceiling). Hobby cron is daily-only. */
+const KEEP_DRAIN_BUDGET = 8;
+const KEEP_DRAIN_TIMEOUT_MS = 28_000;
+
+
+/** Hobby: daily keep is not enough — kick /api/jobs so self-kick chain drains backlog. */
+async function kickJobsIfPending() {
+  const { jobStats } = await import("@/lib/jobs/queue.server");
+  const after = await jobStats().catch(() => null);
+  if (!(after && after.pending > 0)) return;
+  const { kickJobWorker } = await import("@/lib/jobs/queue.server");
+  await kickJobWorker().catch(() => undefined);
+}
+
 async function tick() {
+  const { reclaimStuckJobs } = await import("@/lib/jobs/queue.server");
+  await reclaimStuckJobs().catch(() => undefined);
   const jobs = await withTimeout(
-    drainJobs().catch((err) => ({ error: err instanceof Error ? err.message : "jobs" })),
-    8_000,
+    drainJobs(KEEP_DRAIN_BUDGET).catch((err) => ({ error: err instanceof Error ? err.message : "jobs" })),
+    KEEP_DRAIN_TIMEOUT_MS,
     { error: "timeout" } as { error: string },
   );
+  await kickJobsIfPending().catch(() => undefined);
   later(
     (async () => {
       const { expireCompletedJobs } = await import("@/lib/jobs/queue.server");
@@ -84,19 +101,41 @@ async function tick() {
   return { ...health, jobs };
 }
 
+/** Minimal public response — no username/members/webhook/jobs dump. */
+function publicOk() {
+  return Response.json({ ok: true });
+}
+
 export const Route = createFileRoute("/api/keep")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const probe = new URL(request.url).searchParams.get("probe");
-        const job = typeof process !== "undefined" ? process.env.BARQ_JOB_SECRET?.trim() ?? "" : "";
-        if (probe && job && secretsMatch(probe, job)) {
+        const url = new URL(request.url);
+        const probeParam = url.searchParams.get("probe") ?? "";
+        const legacyProbe = legacyKeepProbeSecret(request);
+        const authed = authorizeJobRequest(request) || legacyProbe;
+        if (!authed) return publicOk();
+
+        // Legacy: ?probe=<jobSecret> OR authenticated ?probe=1
+        if (legacyProbe || probeParam === "1") {
           const result = await probePauseSend();
           return Response.json(result);
         }
         return Response.json(await tick());
       },
-      POST: async () => Response.json(await tick()),
+      POST: async ({ request }) => {
+        let bodySecret: string | undefined;
+        try {
+          const body = (await request.json()) as { secret?: unknown };
+          if (typeof body?.secret === "string") bodySecret = body.secret;
+        } catch {
+          bodySecret = undefined;
+        }
+        if (!authorizeJobRequest(request, bodySecret)) {
+          return Response.json({ error: "unauthorized" }, { status: 401 });
+        }
+        return Response.json(await tick());
+      },
     },
   },
 });

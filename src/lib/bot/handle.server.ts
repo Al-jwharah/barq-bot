@@ -57,7 +57,7 @@ import { rateLimitUser } from "./rate-limit.server";
 import { friendlyError, logEvent, requestId } from "./observability.server";
 import { maybeFunnyAd } from "./ads.server";
 import { stampMedia } from "./watermark.server";
-import { MediaBlockedError, userBlockMessage } from "./safety";
+import { MediaBlockedError, metadataVerdict, userBlockMessage } from "./safety";
 import { awaitMap, busySet, clearAwait, heroFileId, inGrokMode, lastClip, peekAwait, setAwait, setHeroFileId, setLastClip, setLastOwnerMedia } from "./session.server";
 import { botSettings, downloadAccess, joinHref } from "./settings.server";
 import { liveUsername, markError, markProcessed } from "./state";
@@ -111,7 +111,9 @@ import {
   blocksBannedJob,
   hostfileYieldsToDownload,
   decideHostfile,
+  multiLinkStatusText,
   parseJobCancelId,
+  selectDownloadUrls,
   swallowSideEffect,
 } from "./handle-guards";
 import {
@@ -177,9 +179,9 @@ function howText(free: number, channel: string, role: UserRole = "free"): string
   if (role === "sub") {
     return `كيف يعمل برق ⚡️
 
-1. انسخ رابط المقطع
+1. انسخ الرابط من يوتيوب / تيك توك / إنستغرام / إكس / فيسبوك
 2. الصقه هنا
-3. يصلك الملف بأعلى جودة
+3. اختر الجودة أو «صوت فقط» إن ظهرت، أو يصلك أفضل جودة متاحة
 
 اشتراكك ساري — التحميل بلا حدود.
 
@@ -189,12 +191,11 @@ function howText(free: number, channel: string, role: UserRole = "free"): string
   if (TEMP_FREE) {
     return `كيف يعمل برق ⚡️
 
-1. انسخ رابط المقطع من أي منصة
+1. انسخ الرابط من يوتيوب / تيك توك / إنستغرام / إكس / فيسبوك
 2. الصقه هنا
-3. يصلك الملف بأعلى جودة
+3. اختر الجودة أو «صوت فقط» إن ظهرت، أو يصلك أفضل جودة متاحة
 
 اكتب أي شيء لـ Barq AI: لخّص الفيديو، اشرح، حوّل فكرة.
-تنبيه: المحتوى الإباحي و+18 قد يودي للحظر. نحن براء أمام الله من هذا المحتوى.
 
 التحديثات: @${channel || "barq_all"}
 الدعم @${SUPPORT_USERNAME}
@@ -204,9 +205,7 @@ ${SUPPORT_EMAIL}`;
 
 1. انسخ رابط المقطع من تيك توك أو إنستغرام أو يوتيوب أو إكس أو فيسبوك أو أي منصة
 2. الصقه هنا
-3. يصلك الملف بأعلى جودة
-
-تنبيه: المحتوى الإباحي و+18 قد يودي للحظر. نحن براء أمام الله من هذا المحتوى.
+3. اختر 720 / 1080 / أفضل متاح أو «صوت فقط»، أو يصلك أعلى جودة ضمن حد تليجرام
 
 المجاني
 ${join}
@@ -216,9 +215,7 @@ ${join}
 ${SUB_SAR} ريال شهريًا بنجوم تليجرام — تحميل بلا حدود ورابط مختصر لكل مقطع.
 
 الدعم
-@${SUPPORT_USERNAME}
-
-حد تليجرام: إذا كان الأصل أكبر، تصلك أزرار الجودة المباشرة.`;
+@${SUPPORT_USERNAME}`;
 }
 
 function startCaption(free: number, channel: string, role: UserRole): string {
@@ -241,12 +238,9 @@ function startCaption(free: number, channel: string, role: UserRole): string {
     return publicStartCaption({ free, channel, support: SUPPORT_USERNAME });
   }
   return `${BOT_DISPLAY_NAME}
-حمّل أي فيديو أو صورة بأعلى جودة خلال ثوانٍ.
-
-كيف تستخدم البوت
-1. انسخ رابط المقطع
-2. الصقه هنا
-3. يصلك الملف بتوقيع برق
+الصق الرابط ← يصلك الفيديو.
+يوتيوب · تيك توك · إنستغرام · إكس · فيسبوك وغيرها.
+بعد الرابط: اختر الجودة أو «صوت فقط» عند توفرها.
 
 المجاني
 ${join}
@@ -299,6 +293,15 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
       [{ text: "دعم فني", url: SUPPORT_URL }],
     ];
   }
+  // Soft public beta (TEMP_FREE): keep inline nav aligned with FREE_KEYBOARD — no journey/points wall.
+  if (TEMP_FREE) {
+    const soft: TgBtn[][] = [
+      [{ text: "كيف يعمل", callback_data: "go:how" }],
+    ];
+    if (channel) soft.push([{ text: "قناة التحديثات", url: joinHref(channel) }]);
+    soft.push([{ text: "دعم فني", url: SUPPORT_URL }]);
+    return soft;
+  }
   const rows: TgBtn[][] = [
     [{ text: "Barq AI", callback_data: "go:ai" }],
     [{ text: "رابط مؤقت", callback_data: "go:short" }],
@@ -310,14 +313,10 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
     [{ text: "كيف يعمل", callback_data: "go:how" }],
   ];
   if (channel) {
-    if (TEMP_FREE) {
-      rows.push([{ text: "قناة التحديثات", url: joinHref(channel) }]);
-    } else {
-      rows.push([
-        { text: "انضم للقناة", url: joinHref(channel) },
-        { text: "تحقق من الانضمام", callback_data: "go:joinok" },
-      ]);
-    }
+    rows.push([
+      { text: "انضم للقناة", url: joinHref(channel) },
+      { text: "تحقق من الانضمام", callback_data: "go:joinok" },
+    ]);
   }
   rows.push([{ text: "دعم فني", url: SUPPORT_URL }]);
   return rows;
@@ -588,13 +587,88 @@ async function sendHostedMedia(chatId: number, fromId: number, result: ExtractRe
   return sent.message_id ?? null;
 }
 
+function distinctHeights(item: MediaItem): number[] {
+  const fromVariants = item.variants
+    .map((v) => v.height)
+    .filter((h): h is number => typeof h === "number" && h > 0);
+  if (item.height && item.height > 0) fromVariants.push(item.height);
+  const buckets = new Set<number>();
+  for (const h of fromVariants) {
+    const nearest = [360, 480, 720, 1080].reduce((best, cand) =>
+      Math.abs(cand - h) < Math.abs(best - h) ? cand : best,
+    );
+    if (Math.abs(nearest - h) <= 100) buckets.add(nearest);
+  }
+  return [...buckets].sort((a, b) => a - b);
+}
+
+function chosenQualityLabel(item: MediaItem): string {
+  const ranked = [...(item.variants.length ? item.variants : [{ url: item.url, quality: "أصل", height: item.height }])].sort(
+    (a, b) =>
+      (b.height ?? 0) - (a.height ?? 0) ||
+      (Number((b as { size?: number }).size) || 0) - (Number((a as { size?: number }).size) || 0),
+  );
+  const top = ranked[0];
+  if (top?.height) return `${top.height}p`;
+  if (top?.quality) return top.quality;
+  return "أفضل متاح";
+}
+
+/** After auto-deliver: offer MP3 extract. */
+export async function offerAudioOnly(
+  chatId: number,
+  fromId: number,
+  result: ExtractResult,
+  stamp: boolean,
+): Promise<void> {
+  const item =
+    result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") ??
+    result.items[0];
+  if (!item || item.kind === "photo") return;
+  const { saveMediaPick, toPickPayload } = await import("./library.server");
+  const pickId = await saveMediaPick(fromId, chatId, toPickPayload(result, stamp));
+  const q = chosenQualityLabel(item);
+  await telegram
+    .sendMessage(chatId, `الجودة المُرسلة: ${q}\nيمكنك أيضًا استخراج الصوت:`, {
+      reply_markup: inlineKeyboard([[{ text: "صوت فقط 🎵", callback_data: `q:${pickId}:mp3` }]]),
+    })
+    .catch(() => undefined);
+}
+
 export async function sendQualityPicker(
-  _chatId: number,
-  _fromId: number,
-  _result: ExtractResult,
-  _stamp: boolean,
+  chatId: number,
+  fromId: number,
+  result: ExtractResult,
+  stamp: boolean,
 ): Promise<boolean> {
-  return false;
+  const item =
+    result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") ??
+    result.items[0];
+  if (!item || item.kind === "photo") return false;
+
+  const heights = distinctHeights(item);
+  const multi = heights.length >= 2 || item.variants.length >= 2;
+  if (!multi) return false;
+
+  const { saveMediaPick, toPickPayload } = await import("./library.server");
+  const pickId = await saveMediaPick(fromId, chatId, toPickPayload(result, stamp));
+
+  const row1: TgBtn[] = [];
+  for (const h of [720, 1080, 480, 360]) {
+    if (!heights.includes(h)) continue;
+    row1.push({ text: `${h}p`, callback_data: `q:${pickId}:${h}` });
+  }
+  const rows: TgBtn[][] = [];
+  if (row1.length) rows.push(row1.slice(0, 4));
+  rows.push([
+    { text: "أفضل متاح ⚡️", callback_data: `q:${pickId}:best` },
+    { text: "صوت فقط 🎵", callback_data: `q:${pickId}:mp3` },
+  ]);
+
+  const title = (result.title || result.text || "").trim().slice(0, 80);
+  const head = title ? `اختر الجودة\n${title}` : "اختر الجودة أو صوت فقط";
+  await telegram.sendMessage(chatId, head, { reply_markup: inlineKeyboard(rows) });
+  return true;
 }
 
 export async function fulfillQualityPick(chatId: number, fromId: number, pickId: string, choice: import("./library.server").QualityChoice) {
@@ -657,9 +731,7 @@ export async function fulfillQualityPick(chatId: number, fromId: number, pickId:
     who: { id: fromId },
   }).catch(() => undefined);
   await sendPlayCard(chatId, fromId, result).catch(() => undefined);
-  await bumpDownload(fromId).catch(() => undefined);
-  const { bumpDownloadOk } = await import("./growth.server");
-  await bumpDownloadOk(fromId).catch(() => undefined);
+  // Quota/bump already applied when the quality picker was shown (or by caller).
   await logDownload({
     tgId: fromId,
     url: result.sourceUrl,
@@ -741,16 +813,21 @@ async function sendStart(chatId: number, member: Member) {
     await sendOwnerPanel(chatId);
     return;
   }
-  const s = await botSettings();
+  // keysFor is sync when member is passed — avoid DB fan-out before first reply.
   const role = roleOf(fromId, member);
-  const { getGrowth } = await import("./growth.server");
-  const growth = await getGrowth(fromId).catch(() => null);
-  if (growth && growth.onboarding_step >= 0) {
-    const sql = await (await import("@/lib/db")).getSql();
-    await sql`update user_stats set onboarding_step = -1 where tg_id = ${String(fromId)}`.catch(() => undefined);
-  }
+  const markup = await keysFor(fromId, member);
+  const s = await botSettings();
   const caption = startCaption(s.freeDownloads, s.requiredChannel, role);
-  await telegram.sendMessage(chatId, caption, { reply_markup: await keysFor(fromId, member) });
+  await telegram.sendMessage(chatId, caption, { reply_markup: markup });
+  // Onboarding clear after reply — must not delay /start.
+  void import("./growth.server")
+    .then(async ({ getGrowth }) => {
+      const growth = await getGrowth(fromId).catch(() => null);
+      if (!(growth && growth.onboarding_step >= 0)) return;
+      const sql = await (await import("@/lib/db")).getSql();
+      await sql`update user_stats set onboarding_step = -1 where tg_id = ${String(fromId)}`.catch(() => undefined);
+    })
+    .catch(() => undefined);
 }
 
 async function sendSubInvoice(chatId: number, fromId?: number) {
@@ -871,7 +948,7 @@ async function claimAdBonus(chatId: number, fromId: number, member: Member) {
   await telegram.sendMessage(
     chatId,
     `تم تجديد ${s.freeDownloads} تحميلات مجانية. أرسل الرابط الآن.`,
-    { reply_markup: FREE_KEYBOARD },
+    { reply_markup: await keysFor(fromId, member) },
   );
 }
 
@@ -1430,26 +1507,15 @@ function pickPlayUrl(result: ExtractResult): string | undefined {
   return ranked[0]?.url || item.url;
 }
 
+/** Post-download UX: short line + at most one share button. Quality/MP3 live on offerAudioOnly / sendQualityPicker. */
 export async function sendAfterDownload(chatId: number) {
   const clip = lastClip(chatId);
   const { shareTargets } = await import("./product.server");
   const url = clip?.url || `https://t.me/${BOT_USERNAME}`;
   const s = shareTargets(url, clip?.title);
   await swallowSideEffect(() =>
-    telegram.sendMessage(chatId, "تم التحميل ⚡️ شارك من أي منصة", {
-      reply_markup: inlineKeyboard([
-        [{ text: "مشاركة على تليجرام", url: s.telegram }],
-        [{ text: "سناب شات", url: s.snapchat }],
-        [
-          { text: "واتساب", url: s.whatsapp },
-          { text: "إكس", url: s.x },
-        ],
-        [{ text: "فيسبوك", url: s.facebook }],
-        [{ text: "تحليل الفيديو 🤖", callback_data: "ai:analyze" }],
-        [{ text: "تجهيز للنشر", callback_data: "ai:studio" }],
-        [{ text: "تقييم", callback_data: "rt:ask" }],
-        [{ text: "ادعمنا بكوب قهوة", callback_data: "go:coffee" }],
-      ]),
+    telegram.sendMessage(chatId, "تم التحميل ⚡️", {
+      reply_markup: inlineKeyboard([[{ text: "مشاركة", url: s.telegram }]]),
     }),
   );
 }
@@ -1529,6 +1595,20 @@ export async function assertSafeMedia(url: string, result?: ExtractResult) {
       if (item.url) await assertSafeOutboundUrl(item.url).catch(() => undefined);
     }
   }
+  const csam = metadataVerdict({
+    url,
+    title: result?.title,
+    text: result?.text,
+    author: result?.author,
+    platform: result?.platform,
+  });
+  if (csam?.block) {
+    throw new MediaBlockedError(
+      "هذا المحتوى محظور (حماية القُصّر).",
+      csam.evidence,
+      csam.kind,
+    );
+  }
   try {
     const { extraBlockKeywords } = await import("./product.server");
     const words = await extraBlockKeywords();
@@ -1539,6 +1619,26 @@ export async function assertSafeMedia(url: string, result?: ExtractResult) {
     }
   } catch (err) {
     if (err instanceof MediaBlockedError) throw err;
+  }
+}
+
+/** Enqueue up to MULTI_LINK_CAP URLs with status; never silently ignore extras. */
+async function enqueueMessageUrls(
+  chatId: number,
+  fromId: number,
+  urls: string[],
+  member: Member,
+  updateId?: number,
+) {
+  const { batch, total } = selectDownloadUrls(urls);
+  if (!batch.length) return;
+  const status = multiLinkStatusText(total);
+  if (status) {
+    await telegram.sendMessage(chatId, status).catch(() => undefined);
+  }
+  for (let i = 0; i < batch.length; i++) {
+    // update_id claim is once-per-update; only the first job may carry it.
+    await handleDownload(chatId, fromId, batch[i]!, member, i === 0 ? updateId : undefined);
   }
 }
 
@@ -1835,8 +1935,8 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   if (member.isNew && !owner && !text.startsWith("/start")) {
     await telegram.sendMessage(
       chatId,
-      `أهلًا بك في برق ⚡️\nالبوت مجاني. الصق أي رابط فيديو.\nBarq AI معك — ${BARQ_AI_DAILY} رسائل يوميًا.`,
-      { reply_markup: FREE_KEYBOARD },
+      `أهلًا بك في برق ⚡️\nالصق الرابط ← فيديو.\nبعد الرابط: جودة أو صوت فقط.\nBarq AI — ${BARQ_AI_DAILY} رسائل يوميًا.`,
+      { reply_markup: await keysFor(fromId, member) },
     );
   }
 
@@ -1850,7 +1950,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   const downloadUrls = urlsFromMessage(msg);
   if (downloadUrls[0]) {
     clearAwait(fromId);
-    await handleDownload(chatId, fromId, downloadUrls[0], member, updateId);
+    await enqueueMessageUrls(chatId, fromId, downloadUrls, member, updateId);
     return;
   }
 
@@ -2144,7 +2244,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     }
     const grokUrls = urlsFromMessage(msg);
     if (grokUrls[0]) {
-      await handleDownload(chatId, fromId, grokUrls[0], member, updateId);
+      await enqueueMessageUrls(chatId, fromId, grokUrls, member, updateId);
       return;
     }
     await handleOwnerChat(chatId, text || "(رسالة بلا نص)", fromId);
@@ -2357,7 +2457,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
 
-  await handleDownload(chatId, fromId, urls[0]!, member, updateId);
+  await enqueueMessageUrls(chatId, fromId, urls, member, updateId);
 }
 
 function chatIdFromUpdate(update: TgUpdate): number | null {
@@ -2378,18 +2478,29 @@ async function ackStart(update: TgUpdate): Promise<boolean> {
   const chatId = msg.chat.id;
   const fromId = msg.from?.id ?? 0;
   const owner = isOwnerId(fromId) || isOwnerId(chatId);
+  let markup = OWNER_KEYBOARD;
+  if (!owner) {
+    try {
+      const { getMember } = await import("./store.server");
+      const member = await getMember(fromId).catch(() => null);
+      markup = await keysFor(fromId, member);
+    } catch {
+      const { freeKeyboardFor } = await import("./keyboard");
+      markup = freeKeyboardFor(null);
+    }
+  }
   await telegram.sendMessage(
     chatId,
     owner
       ? `${BOT_DISPLAY_NAME}\nأنت المالك. أرسل رابط أو افتح لوحة التحكم.`
       : "برق ⚡️ الصق الرابط واستلم الفيديو.\nتيك توك · إنستغرام · إكس · يوتيوب",
-    { reply_markup: owner ? OWNER_KEYBOARD : FREE_KEYBOARD },
+    { reply_markup: markup },
   );
   return true;
 }
 
 export async function handleUpdate(update: TgUpdate) {
-  await ackStart(update).catch(() => undefined);
+  const ackedStart = await ackStart(update).catch(() => false);
   const { receiveTelegramUpdate, markTelegramUpdateProcessed, markTelegramUpdateFailed, updateTypeOf } =
     await import("./telegram-updates.server");
   const urls = update.message ? urlsFromMessage(update.message) : [];
@@ -2397,6 +2508,24 @@ export async function handleUpdate(update: TgUpdate) {
     if (update.message && urls[0]) {
       await handleMessage(update.message, update.update_id);
       return;
+    }
+    // Plain /start already answered by ackStart — skip heavy sendStart fan-out (no double reply).
+    if (ackedStart && update.message) {
+      const t = (update.message.text ?? "").trim();
+      const arg = t.replace(/^\/start(?:@\w+)?\s*/i, "").trim();
+      const plain =
+        (!arg && /^\/start(?:@\w+)?/i.test(t)) || t === "القائمة" || t === "بدء";
+      if (plain) {
+        let duplicate = false;
+        try {
+          const kind = await receiveTelegramUpdate(update.update_id, updateTypeOf(update));
+          duplicate = kind === "duplicate";
+        } catch {
+          duplicate = false;
+        }
+        if (!duplicate) await markTelegramUpdateProcessed(update.update_id).catch(() => undefined);
+        return;
+      }
     }
     let duplicate = false;
     try {

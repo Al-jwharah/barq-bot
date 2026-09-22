@@ -29,13 +29,19 @@ export const SUB_KEYBOARD = replyKeyboard([
   ["كيف يعمل", SUPPORT_BTN],
 ]);
 
-export const FREE_KEYBOARD = replyKeyboard([
+/** First-contact keyboard: paste-link UX, no points/journey wall of buttons. */
+export const FREE_KEYBOARD = replyKeyboard([["كيف يعمل", SUPPORT_BTN]]);
+
+/** Unlocked after first successful download — points / journey / achievements. */
+export const FREE_KEYBOARD_FULL = replyKeyboard([
   ["رابط مؤقت", "سجلي"],
   ["حدّي", "Barq AI"],
   ["رحلتي", "إنجازاتي"],
   ["أعجبني", "حسابي"],
   ["نقاطي", "كيف يعمل"],
 ]);
+
+/** Hint labels mentioned in /start; quality/audio are inline after a link. */
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";
 
@@ -46,12 +52,18 @@ export function roleOf(fromId: number, member?: Member | null): UserRole {
   return "free";
 }
 
+export function freeKeyboardFor(member?: Member | null) {
+  if ((member?.downloads_used ?? 0) > 0) return FREE_KEYBOARD_FULL;
+  return FREE_KEYBOARD;
+}
+
 export async function keysFor(fromId: number, member?: Member | null) {
-  const role = roleOf(fromId, member ?? (await getMember(fromId)));
+  const resolved = member ?? (await getMember(fromId));
+  const role = roleOf(fromId, resolved);
   if (role === "owner" && inGrokMode(fromId)) return GROK_KEYBOARD;
   if (role === "owner") return OWNER_KEYBOARD;
   if (role === "admin") return replyKeyboard([["لوحة التحكم", "/jobs"], ["/tickets", "كيف يعمل"]]);
   if (role === "moderator") return replyKeyboard([["/reports", "/block"], ["كيف يعمل"]]);
   if (role === "support") return replyKeyboard([["/tickets", "كيف يعمل"]]);
-  return FREE_KEYBOARD;
+  return freeKeyboardFor(resolved);
 }
