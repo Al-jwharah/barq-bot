@@ -12,6 +12,7 @@ import {
   clearBlobSuspendedForTests,
   SHORT_LINK_HIDDEN_AR,
 } from "./blob-status.server.ts";
+import { SHORT_LINKS_UI } from "./config.server.ts";
 
 test("detects BlobStoreSuspendedError by name and message", () => {
   const err = Object.assign(new Error("This store has been suspended."), {
@@ -36,7 +37,6 @@ test("blobUploadReady false when suspended or no token", () => {
   delete process.env.BLOB_READ_WRITE_TOKEN;
   clearBlobSuspendedForTests();
   assert.equal(blobUploadReady(), false);
-  assert.equal(shortLinksAdvertised(), false);
   process.env.BLOB_READ_WRITE_TOKEN = "tok";
   assert.equal(blobUploadReady(), true);
   markBlobSuspended();
@@ -45,4 +45,12 @@ test("blobUploadReady false when suspended or no token", () => {
   clearBlobSuspendedForTests();
   if (prev === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
   else process.env.BLOB_READ_WRITE_TOKEN = prev;
+});
+
+test("shortLinksAdvertised follows SHORT_LINKS_UI even if Blob suspended", () => {
+  // CTAs stay visible; handlers soft-fail. tgfile fallback may still serve.
+  assert.equal(shortLinksAdvertised(), SHORT_LINKS_UI);
+  markBlobSuspended();
+  assert.equal(shortLinksAdvertised(), SHORT_LINKS_UI);
+  clearBlobSuspendedForTests();
 });
