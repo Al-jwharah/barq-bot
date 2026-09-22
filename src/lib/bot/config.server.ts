@@ -5,6 +5,8 @@ const FALSE_FLAG = new Set(["0", "false", "off", "no"]);
 export const KNOWN_BOOLEAN_FLAGS = [
   "BARQ_TEMP_FREE",
   "BARQ_SUBSCRIPTIONS_LIVE",
+  "BARQ_LEADERBOARD_LIVE",
+  "BARQ_TELEGRAM_LOGIN_ENABLED",
   "BARQ_DAILY_CAP_ON",
   "BARQ_MAINTENANCE",
   "BARQ_VAULT_ARCHIVE_ENABLED",
@@ -65,6 +67,10 @@ export const OWNER_IDS = (env("BARQ_OWNER_IDS") ?? "8471762251,5554780316")
 export const TEMP_FREE = envFlag("BARQ_TEMP_FREE", true);
 /** Charging the public. Keep false until the owner says launch. */
 export const SUBSCRIPTIONS_LIVE = envFlag("BARQ_SUBSCRIPTIONS_LIVE", false);
+/** Weekly leaderboard page + /api/leaderboard. Default OFF until owner enables. */
+export const LEADERBOARD_LIVE = envFlag("BARQ_LEADERBOARD_LIVE", false);
+/** Telegram Login Widget for /library. Default OFF — needs BotFather domain + owner config. */
+export const TELEGRAM_LOGIN_ENABLED = envFlag("BARQ_TELEGRAM_LOGIN_ENABLED", false);
 export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 5) || 5;
 export const DAILY_CAP_ON = envFlag("BARQ_DAILY_CAP_ON", true);
 export const MAINTENANCE = envFlag("BARQ_MAINTENANCE", false);
