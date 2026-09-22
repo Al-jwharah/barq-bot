@@ -20,11 +20,25 @@ const LIVE = new Set(["/live", "البث", "live recorder"]);
 const ACCOUNT = new Set(["حسابي", "/account", "سجلي", "/history", "سجل التحميل"]);
 const POINTS = new Set(["نقاطي", "/points"]);
 const SUB = new Set(["الاشتراك", "اشترك الآن", "تجديد الاشتراك", "/sub", "حالة الاشتراك"]);
-const SHORT = new Set(["رابط مؤقت", "رابط مختصر 24س", "اشغله", "/short"]);
+const SHORT = new Set([
+  "رابط مؤقت",
+  "رابط مختصر 24س",
+  "رابط مختصر",
+  "اختصار",
+  "اشغله",
+  "/short",
+  "/اختصار",
+]);
 const HELP = new Set(["كيف يعمل", "/help"]);
 
 function norm(text: string): string {
   return text.trim().toLowerCase();
+}
+
+/** True for reply-keyboard / slash aliases that start the short-link flow. */
+export function isShortCommand(text: string): boolean {
+  const n = norm(text);
+  return n.startsWith("/short") || n.startsWith("/اختصار") || SHORT.has(n);
 }
 
 export function classifyIntent(input: {
@@ -48,7 +62,7 @@ export function classifyIntent(input: {
   if (n.startsWith("/account") || n.startsWith("/history") || ACCOUNT.has(n)) return "account";
   if (n.startsWith("/points") || POINTS.has(n)) return "points";
   if (n.startsWith("/sub") || SUB.has(n)) return "subscription";
-  if (n.startsWith("/short") || SHORT.has(n)) return "short";
+  if (isShortCommand(text)) return "short";
   if (n.startsWith("/help") || HELP.has(n)) return "help";
   if (n.startsWith("/")) return "command";
   return "other";

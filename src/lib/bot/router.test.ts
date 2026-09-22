@@ -67,3 +67,16 @@ test("/ai لخص => ai", () => {
 test("/grok => ai", () => {
   assert.equal(classifyIntent({ text: "/grok", urls: [], hasFile: false }), "ai");
 });
+
+test("اختصار / رابط مختصر => short", () => {
+  assert.equal(classifyIntent({ text: "اختصار", urls: [], hasFile: false }), "short");
+  assert.equal(classifyIntent({ text: "رابط مختصر", urls: [], hasFile: false }), "short");
+  assert.equal(classifyIntent({ text: "/اختصار", urls: [], hasFile: false }), "short");
+});
+
+test("isShortCommand aliases", async () => {
+  const { isShortCommand } = await import("./router.ts");
+  assert.equal(isShortCommand("اختصار"), true);
+  assert.equal(isShortCommand("رابط مختصر"), true);
+  assert.equal(isShortCommand("مرحبا"), false);
+});

@@ -126,7 +126,7 @@ import {
   roleOf,
   type UserRole,
 } from "./keyboard";
-import { classifyIntent } from "./router";
+import { classifyIntent, isShortCommand } from "./router";
 import { aiEntryCopy, decideAiRoute } from "./ai/route";
 import { postDeliveryAiRows, postDeliveryCaption, captionMenuRows } from "./ai/post-delivery";
 import { parseCaptionCallback } from "./ai/captions";
@@ -1629,7 +1629,10 @@ async function sendShortLink(chatId: number, fromId: number) {
       },
     );
   } catch {
-    await telegram.sendMessage(chatId, "تعذر إنشاء الرابط المختصر. أعد المحاولة.");
+    await telegram.sendMessage(
+      chatId,
+      "تعذر إنشاء الرابط المختصر. إن استمر الخطأ فتخزين الملفات (Blob) قد يكون معلّقًا — أعد المحاولة لاحقًا.",
+    );
   }
 }
 
@@ -2524,7 +2527,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await telegram.sendMessage(chatId, "أرسل كلمة البحث: عنوان أو رابط أو منصة.");
     return;
   }
-  if (text === "رابط مؤقت" || text === "رابط مختصر 24س" || text === "اشغله" || text.startsWith("/short")) {
+  if (isShortCommand(text)) {
     setAwait(fromId, "hostfile");
     await telegram.sendMessage(
       chatId,

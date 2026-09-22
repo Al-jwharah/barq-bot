@@ -53,3 +53,10 @@ test("clip not-found response is opaque (no storage leak)", () => {
   assert.equal(res.status, 404);
   assert.equal(CLIP_NOT_FOUND_BODY, "Not Found");
 });
+
+test("tgfile short-link path resolves via getFile (not user URL fetch)", () => {
+  const src = readFileSync(new URL("./clip-serve.server.ts", import.meta.url), "utf8");
+  assert.match(src, /tgFileIdFromStorageKey/);
+  assert.match(src, /api\.telegram\.org\/file\/bot/);
+});
+

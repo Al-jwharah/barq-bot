@@ -1,5 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { TELEGRAM_BOT_TOKEN } from "./config.server";
+import {
+  BLOB_SUSPENDED_AR,
+  isBlobStoreUnavailable,
+  tgFileStorageKey,
+} from "./blob-status.server";
 import { createClipLink } from "./store.server";
 import { telegram, type TgMessage } from "./telegram.server";
 
@@ -59,26 +64,21 @@ export function fileFromMessage(msg: TgMessage): {
   return null;
 }
 
-export async function hostTelegramFile(input: {
+async function putHostBlob(input: {
   fileId: string;
-  kind: HostKind;
   fileName?: string;
   mime?: string;
   tgId: number;
-}): Promise<{ id: string; mediaUrl: string; expiresAt: string }> {
+  filePath: string;
+}): Promise<string> {
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  if (!token) throw new Error("التخزين غير جاهز");
-  const file = await telegram.getFile(input.fileId);
-  if (!file.file_path) throw new Error("تعذر قراءة الملف");
-  if ((file.file_size ?? 0) > 20 * 1024 * 1024) {
-    throw new Error("الحد 20 ميغابايت (قيود تيليجرام للبوت)");
-  }
+  if (!token) throw new Error("no blob token");
   const res = await fetch(
-    `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file.file_path}`,
+    `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${input.filePath}`,
   );
   if (!res.ok) throw new Error("تعذر تنزيل الملف من تليجرام");
   const blob = await res.blob();
-  const name = (input.fileName || file.file_path.split("/").pop() || "file").replace(
+  const name = (input.fileName || input.filePath.split("/").pop() || "file").replace(
     /[^\w.-]+/g,
     "_",
   );
@@ -90,13 +90,63 @@ export async function hostTelegramFile(input: {
     addRandomSuffix: false,
     contentType: input.mime || blob.type || "application/octet-stream",
   });
+  return pathname;
+}
+
+/**
+ * Host a Telegram file for a 24h short link.
+ * Prefer Vercel Blob; if the store is suspended/missing, fall back to
+ * Telegram file_id (resolved via getFile on each /d download — no new secret).
+ */
+export async function hostTelegramFile(input: {
+  fileId: string;
+  kind: HostKind;
+  fileName?: string;
+  mime?: string;
+  tgId: number;
+}): Promise<{ id: string; mediaUrl: string; expiresAt: string; backend: "blob" | "telegram" }> {
+  const file = await telegram.getFile(input.fileId);
+  if (!file.file_path) throw new Error("تعذر قراءة الملف");
+  if ((file.file_size ?? 0) > 20 * 1024 * 1024) {
+    throw new Error("الحد 20 ميغابايت (قيود تيليجرام للبوت)");
+  }
+
+  let storageKey: string | null = null;
+  let backend: "blob" | "telegram" = "telegram";
+
+  if (process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
+    try {
+      storageKey = await putHostBlob({
+        fileId: input.fileId,
+        fileName: input.fileName,
+        mime: input.mime,
+        tgId: input.tgId,
+        filePath: file.file_path,
+      });
+      backend = "blob";
+    } catch (err) {
+      if (!isBlobStoreUnavailable(err)) {
+        // Non-billing errors (download failed, etc.) still surface
+        const msg = err instanceof Error ? err.message : "";
+        if (msg && !/no blob token/i.test(msg)) throw err instanceof Error ? err : new Error(String(err));
+      }
+      console.warn("[host] Blob unavailable — using Telegram file_id fallback");
+    }
+  }
+
+  if (!storageKey) {
+    if (!input.fileId) throw new Error(BLOB_SUSPENDED_AR);
+    storageKey = tgFileStorageKey(input.fileId);
+    backend = "telegram";
+  }
+
   const clip = await createClipLink({
     tgId: input.tgId,
-    url: `clip:${pathname}`,
+    url: `clip:${storageKey}`,
     kind: input.kind,
     platform: "upload",
-    storageKey: pathname,
+    storageKey,
     maxHits: 200,
   });
-  return { id: clip.id, mediaUrl: "", expiresAt: clip.expiresAt };
+  return { id: clip.id, mediaUrl: "", expiresAt: clip.expiresAt, backend };
 }
