@@ -91,5 +91,6 @@ export function blobUploadReady(): boolean {
  * handlers should prefer lastClip before refusing.
  */
 export function shortLinksAdvertised(): boolean {
-  return SHORT_LINKS_UI && blobUploadReady();
+  // Show CTAs when UI on. Handlers soft-fail in Arabic; tgfile fallback may still serve.
+  return SHORT_LINKS_UI;
 }
