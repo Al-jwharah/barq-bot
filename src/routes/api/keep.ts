@@ -8,6 +8,7 @@ import { setSetting } from "@/lib/bot/store.server";
 import { botHealth } from "@/lib/bot/webhook.server";
 import { drainJobs } from "@/lib/jobs/worker.server";
 import { flushDb } from "@/lib/db";
+import { initSentry } from "@/lib/bot/sentry.server";
 
 function later(task: Promise<unknown>) {
   try {
@@ -63,6 +64,7 @@ async function kickJobsIfPending() {
 }
 
 async function tick() {
+  initSentry();
   const { reclaimStuckJobs } = await import("@/lib/jobs/queue.server");
   await reclaimStuckJobs().catch(() => undefined);
   const jobs = await withTimeout(
