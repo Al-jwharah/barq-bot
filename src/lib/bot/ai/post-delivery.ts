@@ -50,9 +50,9 @@ export function captionMenuRows(): InlineBtn[][] {
 }
 
 export function postDeliveryCaption(hasAi: boolean): string {
-  if (!hasAi) return "تم التحميل ⚡️";
+  if (!hasAi) return "تم التسليم ⚡️ — جاهز للمشاركة.";
   return (
-    `تم التحميل ⚡️\n` +
+    `تم التسليم ⚡️\n` +
     `جرّب «${BARQ_AI_BRAND}» على المقطع:\n` +
     `لخّصه · كابشن · ترجمة · حلّل · للنشر`
   );

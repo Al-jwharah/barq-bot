@@ -131,7 +131,7 @@ import { aiEntryCopy, decideAiRoute } from "./ai/route";
 import { postDeliveryAiRows, postDeliveryCaption, captionMenuRows } from "./ai/post-delivery";
 import { parseCaptionCallback } from "./ai/captions";
 import { SUBTITLES_TOGGLE_CALLBACK } from "./ai/subtitles";
-import { publicStartCaption } from "./copy";
+import { helpCaption, publicStartCaption, shortLinkBlobDownAr, shortLinkNeedMediaAr } from "./copy";
 import { handleUpload } from "./handlers/upload.handler";
 import {
   handleAnalyze,
@@ -186,49 +186,23 @@ function ownerMediaKind(msg: TgMessage): string | null {
 }
 
 function howText(free: number, channel: string, role: UserRole = "free"): string {
-  const join = channel
-    ? `انضم إلى @${channel} (تحديثات وأخبار ومسابقات) لتحصل على ${free} تحميلات مجانية.`
-    : `${free} تحميلات مجانية للتجربة.`;
   if (role === "sub") {
     return `كيف يعمل برق ⚡️
 
-1. انسخ الرابط من يوتيوب / تيك توك / إنستغرام / إكس / فيسبوك
-2. الصقه هنا
-3. اختر الجودة أو «صوت فقط» إن ظهرت، أو يصلك أفضل جودة متاحة
+١) انسخ الرابط من يوتيوب / تيك توك / إنستغرام / إكس / فيسبوك
+٢) الصقه هنا
+٣) اختر الجودة أو «صوت فقط» إن ظهرت — أو يصلك أفضل جودة متاحة
 
 اشتراكك ساري — التحميل بلا حدود.
 
-الدعم
-@${SUPPORT_USERNAME}`;
+الدعم @${SUPPORT_USERNAME}`;
   }
-  if (TEMP_FREE) {
-    return `كيف يعمل برق ⚡️
+  const base = helpCaption({ free, support: SUPPORT_USERNAME, channel });
+  if (TEMP_FREE) return base;
+  return `${base}
 
-1. انسخ الرابط من يوتيوب / تيك توك / إنستغرام / إكس / فيسبوك
-2. الصقه هنا
-3. اختر الجودة أو «صوت فقط» إن ظهرت، أو يصلك أفضل جودة متاحة
-
-اكتب أي شيء لـ برق AI: لخّص الفيديو، اشرح، حوّل فكرة.
-
-التحديثات: @${channel || "barq_all"}
-الدعم @${SUPPORT_USERNAME}
-${SUPPORT_EMAIL}`;
-  }
-  return `كيف يعمل برق ⚡️
-
-1. انسخ رابط المقطع من تيك توك أو إنستغرام أو يوتيوب أو إكس أو فيسبوك أو أي منصة
-2. الصقه هنا
-3. اختر 720 / 1080 / أفضل متاح أو «صوت فقط»، أو يصلك أعلى جودة ضمن حد تليجرام
-
-المجاني
-${join}
-بعد نفادها: اشترك، أو شاهد إعلانًا لتجديد ${free} فيديوهات.
-
-الاشتراك
-${SUB_SAR} ريال شهريًا بنجوم تليجرام — تحميل بلا حدود ورابط مختصر لكل مقطع.
-
-الدعم
-@${SUPPORT_USERNAME}`;
+بعد نفاد الحد اليومي: خطط الاشتراك جاهزة للعرض (الدفع مؤجّل — لا يُخصم الآن).
+أو شاهد إعلانًا لتجديد ${free} فيديوهات عند تفعيل الإعلانات.`;
 }
 
 function startCaption(free: number, channel: string, role: UserRole): string {
@@ -244,27 +218,12 @@ function startCaption(free: number, channel: string, role: UserRole): string {
 
 انسخ الرابط والصقه هنا.`;
   }
-  const join = channel
-    ? `انضم إلى @${channel} ثم اضغط «تحقق من الانضمام» لتحصل على ${free} تحميلات مجانية.`
-    : `${free} تحميلات مجانية ثم اشتراك شهري.`;
   if (TEMP_FREE) {
     return publicStartCaption({ free, channel, support: SUPPORT_USERNAME });
   }
-  return `${BOT_DISPLAY_NAME}
-الصق الرابط ← يصلك الفيديو.
-يوتيوب · تيك توك · إنستغرام · إكس · فيسبوك وغيرها.
-بعد الرابط: اختر الجودة أو «صوت فقط» عند توفرها.
+  return `${publicStartCaption({ free, channel, support: SUPPORT_USERNAME })}
 
-المجاني
-${join}
-أو شاهد إعلانًا لتجديد ${free} فيديوهات.
-
-الاشتراك
-${SUB_SAR} ريال عبر نجوم تليجرام — بلا حدود + رابط مختصر لكل مقطع.
-
-الدعم
-@${SUPPORT_USERNAME}
-
+بعد نفاد الحد: خطط الاشتراك للعرض فقط (الدفع مؤجّل).
 أرسل الرابط الآن.`;
 }
 
@@ -1615,7 +1574,7 @@ async function sendShortLink(chatId: number, fromId: number) {
   if (!clip?.url || !clip.mediaUrl) {
     await telegram.sendMessage(
       chatId,
-      "أرسل رابطًا أو فيديو أو صورة أو ملفًا، ثم اضغط «رابط مؤقت».",
+      shortLinkNeedMediaAr(),
       { reply_markup: await keysFor(fromId) },
     );
     return;
@@ -1643,7 +1602,7 @@ async function sendShortLink(chatId: number, fromId: number) {
     if (clip.mediaUrl) {
       await telegram.sendMessage(
         chatId,
-        "تعذر إنشاء الرابط المختصر (التخزين معلّق أو غير جاهز).\nهذا رابط مباشر للمقطع:",
+        shortLinkBlobDownAr() + (clip.mediaUrl ? "\nهذا رابط مباشر للمقطع:" : ""),
         {
           reply_markup: inlineKeyboard([[{ text: "فتح المقطع", url: clip.mediaUrl }]]),
         },
@@ -1652,7 +1611,7 @@ async function sendShortLink(chatId: number, fromId: number) {
     }
     await telegram.sendMessage(
       chatId,
-      "تعذر إنشاء الرابط المختصر. التخزين غير متاح الآن — أعد إرسال الرابط أو الملف لاحقًا.",
+      shortLinkBlobDownAr(),
     );
   }
 }

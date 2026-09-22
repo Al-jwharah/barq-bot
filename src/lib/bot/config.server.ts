@@ -80,7 +80,7 @@ export const TELEGRAM_LOGIN_ENABLED = envFlag("BARQ_TELEGRAM_LOGIN_ENABLED", fal
 export const ADS_ENABLED = envFlag("BARQ_ADS_ENABLED", false);
 /** Website pricing UI / Telegram deep-links. Separate from BARQ_SUBSCRIPTIONS_LIVE payments. */
 export const SUBSCRIPTIONS_UI = envFlag("BARQ_SUBSCRIPTIONS_UI", true);
-export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 5) || 5;
+export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 10) || 10;
 export const DAILY_CAP_ON = envFlag("BARQ_DAILY_CAP_ON", true);
 export const MAINTENANCE = envFlag("BARQ_MAINTENANCE", false);
 /** Soft public beta seat gate. Default 500 for soft beta; raise via BARQ_LAUNCH_MAX on Vercel (e.g. 1000+) when opening wider. Do not flip Vercel secrets from this repo — set env in the dashboard. Code default applies only when the env var is unset. */
@@ -136,7 +136,7 @@ export const DISCOUNT_USES = 1000;
 export const CHANNEL_USERNAME = "barq_all";
 export const CHANNEL_TITLE = "برق ⚡️ | التحديثات";
 export const CHANNEL_DESCRIPTION =
-  "تحديثات وأخبار ومسابقات برق. البوت @barq_ibot — ٥ تجارب مجانية بعد الانضمام. الدعم @i_2169";
+  "تحديثات وأخبار ومسابقات برق. البوت @barq_ibot — ١٠ تحميلات مجانية يوميًا بعد الانضمام. الدعم @i_2169";
 export const CHANNEL_CHAT = `@${CHANNEL_USERNAME}`;
 export const VAULT_INVITE = env("BARQ_VAULT_INVITE") ?? "https://t.me/+5X9lbwSU6fgzMDFk";
 export const VAULT_CHAT_ID = env("BARQ_VAULT_CHAT_ID") ?? "-1003973499061";

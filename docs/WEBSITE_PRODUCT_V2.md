@@ -49,3 +49,11 @@ Deployed: 2026-09-22 ~19:18 Asia/Riyadh · Vercel project `barq-vid` · **previe
 
 Smoke: `/` `/pricing` `/login` `/register` `/api/ads` `/api/pricing-flags` → 200.
 Flags observed: `BARQ_SUBSCRIPTIONS_LIVE=false`, `BARQ_ADS_ENABLED=false`, `BARQ_SUBSCRIPTIONS_UI=true`.
+
+
+## Owner mandate (2026-09-22) — payment deferred
+
+- `BARQ_SUBSCRIPTIONS_UI=on` — show pricing / plans / Telegram deep-links / gating.
+- `BARQ_SUBSCRIPTIONS_LIVE=off` — **do not** charge, send Stars invoices, or approve `pre_checkout`.
+- Free tier: **10 downloads / Riyadh day** (`BARQ_FREE_DOWNLOADS=10`, `BARQ_DAILY_CAP=10`).
+- Default AI model id (internal): `grok-4.5` — user-facing brand only «برق AI».

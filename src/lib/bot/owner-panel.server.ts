@@ -155,7 +155,7 @@ async function sysText(): Promise<string> {
 حد 5 يومياً: ${flag(s.dailyCapOn)}
 البوت: ${s.paused ? "متوقف" : "يعمل"}
 
-حالياً حد 5 مقاطع/يوم من BARQ_DAILY_CAP_ON أو زر التشغيل. الإعلانات لاحقاً.`;
+حالياً حد 10 مقاطع/يوم من BARQ_DAILY_CAP_ON أو زر التشغيل. الإعلانات لاحقاً.`;
 }
 
 function sysButtons(s: BotSettings): TgBtn[][] {

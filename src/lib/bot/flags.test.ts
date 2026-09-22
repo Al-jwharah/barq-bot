@@ -13,6 +13,7 @@ import {
   COFFEE_ENABLED,
   DAILY_CAP,
   DAILY_CAP_ON,
+  FREE_DOWNLOADS,
   DOWNLOAD_TIMEOUT_MS,
   envFlag,
   FILE_RETENTION_DAYS,
@@ -131,7 +132,8 @@ test("feature flag defaults keep Arabic product identity on", () => {
   assert.equal(ADMIN_LOCK_MINUTES, 15);
   assert.equal(BARQ_TIMEZONE, "Asia/Riyadh");
   assert.equal(CLEANUP_ENABLED, true);
-  assert.equal(DAILY_CAP, 5);
+  assert.equal(DAILY_CAP, 10);
+  assert.equal(FREE_DOWNLOADS, 10);
   assert.equal(BARQ_AI_DAILY, 10);
   assert.equal(VIP_STARS, 200);
   assert.equal(MAX_STARS, 200);
