@@ -1,4 +1,3 @@
-import { SHORT_LINKS_UI } from "./config.server";
 /** Detect Vercel Blob store outages without printing tokens. */
 
 export const TGFILE_PREFIX = "tgfile/";
@@ -51,7 +50,7 @@ export function isTgFileStorageKey(key: string | null | undefined): boolean {
 export function tgFileIdFromStorageKey(key: string): string | null {
   if (!isTgFileStorageKey(key)) return null;
   const id = key.slice(TGFILE_PREFIX.length);
-  if (!id || id.includes("/") || id.includes("..") || id.includes("\")) return null;
+  if (!id || id.includes("/") || id.includes("..") || id.includes("\\")) return null;
   return id;
 }
 
@@ -91,5 +90,5 @@ export function blobUploadReady(): boolean {
  * handlers should prefer lastClip before refusing.
  */
 export function shortLinksAdvertised(): boolean {
-  return SHORT_LINKS_UI && blobUploadReady();
+  return blobUploadReady();
 }

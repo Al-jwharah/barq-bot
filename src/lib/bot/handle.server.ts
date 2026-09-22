@@ -134,6 +134,7 @@ import { SUBTITLES_TOGGLE_CALLBACK } from "./ai/subtitles";
 import { helpCaption, publicStartCaption, shortLinkBlobDownAr, shortLinkNeedMediaAr } from "./copy";
 import {
   blobUploadReady,
+  shortLinksAdvertised,
   SHORT_LINK_HIDDEN_AR,
   SHORT_LINK_OK_HINT_AR,
   markBlobSuspended,
@@ -1548,7 +1549,8 @@ export async function sendAfterDownload(chatId: number, fromId?: number) {
   const { shareTargets } = await import("./product.server");
   const url = clip?.url || `https://t.me/${BOT_USERNAME}`;
   const s = shareTargets(url, clip?.title);
-  const rows = postDeliveryAiRows(clip, s.telegram, { shortLinks: blobUploadReady(, { shortLinks: shortLinksAdvertised() }), aiReady: AI_ENABLED && grokReady() });
+  const aiReady = AI_ENABLED && grokReady();
+  const rows = postDeliveryAiRows(clip, s.telegram, { shortLinks: shortLinksAdvertised(), aiReady });
   await swallowSideEffect(() =>
     telegram.sendMessage(chatId, postDeliveryCaption(aiReady), {
       reply_markup: inlineKeyboard(rows),
