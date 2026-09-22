@@ -21,11 +21,11 @@ export const ACHIEVEMENTS: Record<string, { title: string; hint: string }> = {
   dl_25: { title: "رعد", hint: "٢٥ تحميلًا" },
   streak_3: { title: "ثلاثة أيام", hint: "سلسلة ٣ أيام" },
   streak_7: { title: "أسبوع نور", hint: "سلسلة ٧ أيام" },
-  first_ai: { title: "سأل Barq", hint: "أول رسالة لـ Barq AI" },
+  first_ai: { title: "سأل Barq", hint: "أول رسالة لـ برق AI" },
   supporter: { title: "كوب قهوة", hint: "دعمت المطور" },
   journey_start: { title: "متعلّم", hint: "أنهى رحلة البداية" },
   journey_safe: { title: "أمين", hint: "أنهى رحلة الأمان" },
-  journey_ai: { title: "رفيق الذكاء", hint: "أنهى رحلة Barq AI" },
+  journey_ai: { title: "رفيق الذكاء", hint: "أنهى رحلة برق AI" },
 };
 
 export const ONBOARDING = [
@@ -42,7 +42,7 @@ export const ONBOARDING = [
     body: "بعد الرابط قد تظهر أزرار 720 / 1080 / أفضل متاح أو «صوت فقط».\nالصق الرابط ويصلك الملف.",
   },
   {
-    title: "Barq AI معك",
+    title: "برق AI معك",
     body: "اكتب بالعربية: «لخّص الفيديو» أو «اشرح الفكرة».\n١٠ رسائل يوميًا للجميع. بعدها التحميل يبقى متاحًا.",
   },
   {
@@ -92,7 +92,7 @@ export const JOURNEYS: Record<
     ],
   },
   ai: {
-    title: "رحلة Barq AI",
+    title: "رحلة برق AI",
     achievement: "journey_ai",
     steps: [
       {
@@ -417,7 +417,7 @@ export async function finishOnboarding(chatId: number, tgId: number | string) {
   await unlockDue({ ...stats, onboarding_step: -1 }, tgId, chatId);
   await telegram.sendMessage(
     chatId,
-    `صرت جاهزًا ⚡️\nالصق رابطًا أو اكتب لـ Barq AI.\nالدعم @${SUPPORT_USERNAME}`,
+    `صرت جاهزًا ⚡️\nالصق رابطًا أو اكتب لـ برق AI.\nالدعم @${SUPPORT_USERNAME}`,
   );
 }
 
@@ -444,7 +444,7 @@ export async function sendJourneyList(chatId: number, tgId: number | string) {
       reply_markup: inlineKeyboard([
         [{ text: "رحلة البداية", callback_data: "gx:j:start:0" }],
         [{ text: "رحلة الأمان", callback_data: "gx:j:safe:0" }],
-        [{ text: "رحلة Barq AI", callback_data: "gx:j:ai:0" }],
+        [{ text: "رحلة برق AI", callback_data: "gx:j:ai:0" }],
       ]),
     },
   );

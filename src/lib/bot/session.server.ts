@@ -96,6 +96,8 @@ export function setLastOwnerMedia(chatId: number, messageId: number, kind: strin
 export type LastClip = {
   url: string;
   title?: string;
+  /** Caption / description / post text from extract when available. */
+  description?: string;
   platform?: string;
   mediaUrl?: string;
   thumbnail?: string;

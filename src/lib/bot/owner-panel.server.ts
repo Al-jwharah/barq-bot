@@ -7,7 +7,7 @@ import { can, type Role } from "./roles.server";
 import { permForCallback } from "./acl.server";
 
 export const OWNER_KEYBOARD = replyKeyboard([
-  ["لوحة التحكم", "Barq AI"],
+  ["لوحة التحكم", "برق AI"],
   ["رابط مؤقت", "سجلي"],
   ["المراقبة", "النظام"],
   ["إرسال للجميع", "أخبار القناة"],
@@ -17,7 +17,7 @@ export const OWNER_KEYBOARD = replyKeyboard([
 ]);
 
 export const GROK_KEYBOARD = replyKeyboard([
-  ["إنهاء Barq AI", "النماذج"],
+  ["إنهاء برق AI", "النماذج"],
   ["انشر في القناة", "اسحب فائز"],
   ["لوحة التحكم", "المراقبة"],
   ["القائمة"],
@@ -48,7 +48,7 @@ async function homeText(): Promise<string> {
   return `لوحة تحكم برق
 
 البوت: ${s.paused ? "متوقف" : "يعمل"}
-جروك: ${grok} · ${speedLabel(s.grokSpeed)}
+برق AI: ${grok} · ${speedLabel(s.grokSpeed)}
 القناة: ${channel} · المجاني ${s.freeDownloads}
 
 أعضاء ${stats.members} · مشتركون ${stats.subscribers} · تحميلات ${stats.downloads}
@@ -56,13 +56,13 @@ async function homeText(): Promise<string> {
 الطابور: ${q ? `${q.pending} انتظار · ${q.processing} جاري · ${q.failedToday} فشل اليوم` : "—"}
 معجبون ${(await (await import("./growth.server")).likeCount())}
 
-أول زر: اختيار نموذج جروك.`;
+أول زر: اختيار نموذج برق AI.`;
 }
 
 async function homeButtons(s: BotSettings, role: Role = "owner"): Promise<TgBtn[][]> {
   const likes = await (await import("./growth.server")).likeCount().catch(() => 0);
   const rows: TgBtn[][] = [
-    [{ text: `Barq AI: ${grokModelLabel(s.grokModel)}`, callback_data: "adm:grok" }],
+    [{ text: `برق AI: ${grokModelLabel(s.grokModel)}`, callback_data: "adm:grok" }],
     [
       { text: s.paused ? "تشغيل البوت" : "إيقاف البوت", callback_data: s.paused ? "adm:run" : "adm:pause" },
       { text: s.adsEnabled ? "تشغيل الإعلان لاحقًا" : "الإعلان مطفأ", callback_data: "adm:ads" },
@@ -107,7 +107,7 @@ async function homeButtons(s: BotSettings, role: Role = "owner"): Promise<TgBtn[
 async function grokText(): Promise<string> {
   const s = await botSettings();
   const meta = GROK_MODEL_META[s.grokModel];
-  return `نموذج Barq AI
+  return `نموذج برق AI
 
 المختار الآن: ${meta.label}
 ${meta.hint}
@@ -116,7 +116,7 @@ ${meta.hint}
 الأدوات: ${flag(s.grokTools)} · البحث: ${flag(s.grokWebSearch)}
 المفتاح: ${grokReady() ? "متصل" : "غير متصل"}
 
-اضغط «بدء المحادثة» ثم اكتب — Barq AI يرد وينفّذ أوامرك على البوت.`;
+اضغط «بدء المحادثة» ثم اكتب — برق AI يرد وينفّذ أوامرك على البوت.`;
 }
 
 function grokButtons(s: BotSettings): TgBtn[][] {
@@ -131,7 +131,7 @@ function grokButtons(s: BotSettings): TgBtn[][] {
     ];
   });
   return [
-    [{ text: "بدء المحادثة مع Barq AI", callback_data: "adm:grok_on" }],
+    [{ text: "بدء المحادثة مع برق AI", callback_data: "adm:grok_on" }],
     ...models,
     [
       { text: s.grokSpeed === "fast" ? "• سريع" : "سريع", callback_data: "adm:s_fast" },
@@ -294,7 +294,7 @@ export async function sendOwnerNews(chatId: number) {
 
 ${list}
 
-انشر تحديثًا، ابدأ مسابقة، أو اكتب لجروك.`,
+انشر تحديثًا، ابدأ مسابقة، أو اكتب لـ برق AI.`,
     {
       reply_markup: inlineKeyboard([
         [
@@ -302,7 +302,7 @@ ${list}
           { text: "بدء مسابقة", callback_data: "adm:contest" },
         ],
         [{ text: "اسحب فائز", callback_data: "adm:draw" }],
-        [{ text: "جروك", callback_data: "adm:grok_on" }],
+        [{ text: "برق AI", callback_data: "adm:grok_on" }],
         [{ text: "رجوع للوحة", callback_data: "adm:home" }],
       ]),
     },
@@ -342,21 +342,21 @@ export async function enterGrokMode(chatId: number, fromId: number) {
   await telegram.sendMessage(
     chatId,
     ready
-      ? `وضع Barq AI مفعّل — صلاحيات كاملة على البوت والقناة.
+      ? `وضع برق AI مفعّل — صلاحيات كاملة على البوت والقناة.
 
 النموذج: ${meta.label} · ${meta.hint}
 
 اكتب أي شيء الآن.
 
-للخروج: إنهاء Barq AI`
-      : `وضع Barq AI فُتح لكن المفتاح غير متصل. لوحة التحكم ما زالت تعمل.`,
+للخروج: إنهاء برق AI`
+      : `وضع برق AI فُتح لكن المفتاح غير متصل. لوحة التحكم ما زالت تعمل.`,
     { reply_markup: GROK_KEYBOARD },
   );
 }
 
 export async function exitGrokMode(chatId: number, fromId: number) {
   setGrokMode(fromId, false);
-  await telegram.sendMessage(chatId, "خرجت من محادثة Barq AI. الأزرار العادية رجعت.", {
+  await telegram.sendMessage(chatId, "خرجت من محادثة برق AI. الأزرار العادية رجعت.", {
     reply_markup: OWNER_KEYBOARD,
   });
 }
@@ -596,7 +596,7 @@ export async function handleOwnerPanelCallback(cb: TgCallbackQuery): Promise<voi
       await telegram.answerCallback(cb.id, "للمالك فقط", true);
       return;
     }
-    await telegram.answerCallback(cb.id, "جروك يسمعك");
+    await telegram.answerCallback(cb.id, "برق AI جاهز");
     await enterGrokMode(chatId, fromId);
     return;
   }
@@ -743,7 +743,7 @@ export async function handleOwnerPanelCallback(cb: TgCallbackQuery): Promise<voi
     const likes = await (await import("./growth.server")).likeCount();
     await telegram.sendMessage(
       chatId,
-      `إحصائيات برق\nأعضاء ${stats.members}\nمعجبون ${likes}\nتحميلات ${stats.downloads}\nحجب ${stats.blocked}\nفشل ${stats.failed}\nروابط ${stats.clips}\nنجوم ${stats.stars}\nجروك ${grokReady() && s.grokOwner ? grokModelLabel(s.grokModel) : "متوقف"}`,
+      `إحصائيات برق\nأعضاء ${stats.members}\nمعجبون ${likes}\nتحميلات ${stats.downloads}\nحجب ${stats.blocked}\nفشل ${stats.failed}\nروابط ${stats.clips}\nنجوم ${stats.stars}\nبرق AI ${grokReady() && s.grokOwner ? grokModelLabel(s.grokModel) : "متوقف"}`,
       { reply_markup: OWNER_KEYBOARD },
     );
     return;
@@ -831,7 +831,7 @@ export async function sendWatch(chatId: number, _fromId: number) {
     : "لا حجب مسجّل.";
   await telegram.sendMessage(
     chatId,
-    `مراقبة برق\nأعضاء ${stats.members} · تحميلات ${stats.downloads} · حجب ${stats.blocked} · فشل ${stats.failed}\nجروك: ${grokReady() ? grokModelLabel(s.grokModel) : "غير متصل"}\n\nآخر التحميلات:\n${logLines}\n\nالحجب:\n${blockLines}`,
+    `مراقبة برق\nأعضاء ${stats.members} · تحميلات ${stats.downloads} · حجب ${stats.blocked} · فشل ${stats.failed}\nبرق AI: ${grokReady() ? grokModelLabel(s.grokModel) : "غير متصل"}\n\nآخر التحميلات:\n${logLines}\n\nالحجب:\n${blockLines}`,
     { reply_markup: OWNER_KEYBOARD },
   );
 }

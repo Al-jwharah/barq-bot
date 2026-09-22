@@ -1,30 +1,31 @@
-# Barq AI layer (`feature/ai-layer`)
+# برق AI layer (`feature/barq-ai-v2`)
 
-Shipped on branch `feature/ai-layer` from wip snapshot. No production deploy. Subscriptions stay off on prod. No secret rotate/delete. No DROP/TRUNCATE. Worker Docker files untouched.
+Competitive core for Barq v2. Brand in UI: **«برق AI»** only (never Grok/xAI/جروك). Silent router aliases kept for compat. Subscriptions stay off on prod. No secret rotate/delete. No DROP/TRUNCATE.
 
-## Shipped
+## Status (v2)
 
 | ID | Feature | Status |
 |----|---------|--------|
-| **A5** | Free-text → xAI routing | **Live**: `decideAiRoute` skips UI chrome; `/ai <prompt>` chats immediately; entry copy says ready. |
-| **A1** | Auto-summarize «لخّصه» | **MVP**: post-download button `ai:sum` → Arabic 2–3 sentence summary via xAI. Optional Whisper via proposed ENV only. |
-| **A2** | Smart captions | **MVP**: tones فصحى/خليجي/مصري + copy block. |
-| **A3** | Smart Clips v1 | **Basic**: videos ≥90s; heuristic windows + optional ffmpeg silencedetect energy. Suggestions only (no auto-cut burn). |
-| **A4** | Auto-subtitles | **Opt-in scaffold**: toggle + SRT draft from title; burn-in deferred (`BARQ_AI_SUBTITLES_BURN`). |
+| **A5** | Free-text chat | **REAL**: `decideAiRoute` + `askBarqAI` live model. Missing key → loud Arabic. |
+| **A1** | لخّصه | **REAL**: post-download `ai:sum` → Arabic 2–3 sentences from title/description (+ optional Whisper ENV). |
+| **A2** | كابشن | **REAL**: tones فصحى/خليجي/مصري + copy block from title/description. |
+| **A3** | مقاطع ذكية | **BASIC**: ≥90s heuristic/ffmpeg windows (suggestions only). |
+| **A4** | ترجمة | **REAL draft**: opt-in + live model Arabic lines → SRT scaffold; burn deferred. |
+| **Analyze** | حلّل | **REAL**: model analysis from title/description. |
+| **Studio** | للنشر | **REAL**: multi-platform publish pack from title/description. |
 
-## Proposed ENV (names only — do not commit secrets)
+## Hard rules
+
+- Missing `XAI_API_KEY` → clear Arabic (`AI_MISSING_KEY_AR`) — never soft «يتهيأ».
+- Enrich from extract `text`/description — do not invent video scenes.
+- User copy = «برق AI» only.
+
+## Proposed ENV (names only)
 
 - `BARQ_AI_TRANSCRIBE` / `BARQ_WHISPER_URL` / `BARQ_WHISPER_API_KEY`
 - `BARQ_AI_SUBTITLES` / `BARQ_AI_SUBTITLES_BURN`
 - Existing: `XAI_API_KEY`, `BARQ_AI_ENABLED`, `BARQ_AI_DAILY`
 
-## Deferred
-
-- Full Whisper transcription in production (needs provider + quota)
-- Subtitle burn-in into video (heavy ffmpeg on worker)
-- Smart Clips auto-export of cut files to Telegram
-- Preview deploy / Vercel promotion
-
 ## Tests
 
-`npm run test:ai` — route, summarize, captions, smart-clips, subtitles, post-delivery, router.
+`npm run test:ai` — route, summarize, captions, smart-clips, subtitles, post-delivery, copy, router.

@@ -9,6 +9,13 @@ import {
 } from "./config.server";
 import { parseGrokVerdict, type PornVerdict } from "./safety";
 import type { GrokModel, GrokSpeed } from "./config.server";
+import {
+  AI_DISABLED_AR,
+  AI_GENERIC_ERROR_AR,
+  AI_MISSING_KEY_AR,
+  BARQ_AI_BRAND,
+  isLoudAiFailure,
+} from "./ai/copy";
 
 const API = "https://api.x.ai/v1/chat/completions";
 
@@ -16,7 +23,7 @@ export function grokReady(): boolean {
   return Boolean(grokApiKey());
 }
 
-export const AI_USER_ERROR = "حدث خطأ مؤقت في Barq AI. حاول لاحقًا.";
+export const AI_USER_ERROR = AI_GENERIC_ERROR_AR;
 export const AI_DAILY_LIMIT = BARQ_AI_DAILY;
 export const AI_INPUT_MAX = AI_MAX_MESSAGE_LENGTH;
 export const AI_TOKEN_MAX = AI_MAX_OUTPUT_TOKENS;
@@ -42,7 +49,7 @@ export function wantsWebSearch(text: string): boolean {
 }
 
 export function isAiFailureReply(text: string): boolean {
-  return text === AI_USER_ERROR || text.includes("متوقف مؤقت") || text.includes("يتهيأ");
+  return isLoudAiFailure(text) || text === AI_USER_ERROR || text.includes("متوقف مؤقت");
 }
 
 async function loadLastDownload(userId: number): Promise<{ url: string; title?: string; platform?: string } | undefined> {
@@ -335,13 +342,13 @@ export async function diagnoseDownload(url: string, error: string): Promise<stri
   }
 }
 
-const OWNER_SYSTEM = `أنت Barq AI داخل بوت برق، تتحدث مع المالك فقط بصلاحيات كاملة.
+const OWNER_SYSTEM = `أنت «برق AI» داخل بوت برق، تتحدث مع المالك فقط بصلاحيات كاملة.
 - إذا طلب تنفيذ شيء إداري نفّذه فورًا عبر الأدوات ثم أكّد النتيجة بجملة قصيرة.
 - قناة @barq_all للتحديثات والأخبار والمسابقات. القناة والمجاني والإعلان جاهزة لكن مطفأة حتى يطلب تشغيلها.
 - لا تسأل تأكيدًا إلا إذا كان الأمر إرسالًا جماعيًا أو إيقاف البوت.
 - أجب بالعربية ما لم يكتب بغيرها. كن مباشرًا.
 - لا تكشف مفاتيح API أو توكن البوت.
-- للمستخدمين العاديين اسمك Barq AI وليس جروك.`;
+- للمستخدمين العاديين اسمك «برق AI» فقط — لا تذكر مزوّدين خارجيين.`;
 
 const OWNER_TOOLS = [
   {
@@ -896,25 +903,26 @@ async function ownerChatConfig(): Promise<{
   };
 }
 
-const BARQ_AI_SYSTEM = `أنت Barq AI داخل بوت برق ⚡️. اسمك Barq AI.
+const BARQ_AI_SYSTEM = `أنت «${BARQ_AI_BRAND}» داخل بوت برق ⚡️. اسمك «${BARQ_AI_BRAND}» فقط.
 - تساعد أي مستخدم: تلخيص الفيديو الأخير، البحث عن فيديو/مقطع، شرح، تحويل فكرة، أسئلة عامة.
 - إذا طلب بحثًا عن فيديو استخدم البحث ثم أعطِ روابط أو أسماء واضحة.
 - لا تختلق مشاهد فيديو لم ترها. إن نقص السياق اطلب الرابط.
 - التحميل: الصق الرابط ويصلك الملف. قد تظهر أزرار جودة أو «صوت فقط».
-- لا تكشف لوحة المالك ولا المفاتيح. لا تسمّ نفسك جروك إلا إذا سُئلت عن التقنية.`;
+- لا تكشف لوحة المالك ولا المفاتيح.
+- لا تذكر أسماء مزوّدين أو نماذج خارجية في ردودك للمستخدم.`;
 
 const publicHistory = new Map<number, ChatMessage[]>();
 
 export async function askBarqAI(
   userId: number,
   text: string,
-  clip?: { url: string; title?: string; platform?: string },
+  clip?: { url: string; title?: string; description?: string; platform?: string },
 ): Promise<string> {
   if (!aiEnabled()) {
-    return "Barq AI متوقف مؤقتًا.";
+    return AI_DISABLED_AR;
   }
   if (!grokReady()) {
-    return "Barq AI يتهيأ. الصق رابط الفيديو الآن وأرجع بعد لحظات.";
+    return AI_MISSING_KEY_AR;
   }
   const flightKey = String(userId);
   if (inFlight.has(flightKey)) {
@@ -931,8 +939,9 @@ export async function askBarqAI(
       hist = [];
       publicHistory.set(userId, hist);
     }
+    const desc = "description" in (remembered ?? {}) ? (remembered as { description?: string }).description : undefined;
     const context = remembered
-      ? `\nآخر فيديو حمّله المستخدم:\nالرابط: ${remembered.url}\nالمنصة: ${remembered.platform ?? "-"}\nالعنوان: ${remembered.title ?? "-"}`
+      ? `\nآخر فيديو حمّله المستخدم:\nالرابط: ${remembered.url}\nالمنصة: ${remembered.platform ?? "-"}\nالعنوان: ${remembered.title ?? "-"}${desc?.trim() ? `\nالوصف: ${desc.trim().slice(0, 800)}` : ""}`
       : "\nلا يوجد فيديو أخير في هذه الجلسة.";
     hist.push({ role: "user", content: clipAiInput(text) });
     if (hist.length > 10) hist.splice(0, hist.length - 10);
@@ -983,10 +992,10 @@ export async function askBarqAI(
 
 export async function askOwnerGrok(text: string, fromId: number | string): Promise<string> {
   if (!aiEnabled()) {
-    return "Barq AI متوقف مؤقتًا.";
+    return AI_DISABLED_AR;
   }
   if (!grokReady()) {
-    return "Barq AI غير متاح الآن. أوامر الإدارة ما زالت تعمل من لوحة التحكم.";
+    return AI_MISSING_KEY_AR + "\nأوامر الإدارة ما زالت تعمل من لوحة التحكم.";
   }
   const flightKey = String(fromId);
   if (inFlight.has(flightKey)) {

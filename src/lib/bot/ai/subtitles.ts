@@ -1,13 +1,23 @@
 /**
- * A4 — Auto-subtitles opt-in: toggle + pipeline scaffold (burn deferred).
- * Working MVP: user can enable intent; we scaffold SRT from transcript/title.
+ * A4 — Translate / subtitles: opt-in + live model draft (Arabic), burn deferred.
+ * Uses title/description via chat — never fakes success without a key.
  */
-import { lastClip } from "../session.server";
-import { redactSecrets } from "../grok.server";
+import { lastClip, type LastClip } from "../session.server";
+import { clipAiInput, grokReady, hideProviderError, redactSecrets } from "../grok.server";
+import { AI_ENABLED, AI_MAX_OUTPUT_TOKENS, AI_TIMEOUT_MS, grokApiKey } from "../config.server";
+import {
+  AI_DISABLED_AR,
+  AI_MISSING_KEY_AR,
+  AI_NO_CLIP_AR,
+  BARQ_AI_BRAND,
+  aiReadyGate,
+} from "./copy";
 
 export const SUBTITLES_CALLBACK = "ai:subs";
 export const SUBTITLES_TOGGLE_CALLBACK = "ai:subs:toggle";
-export const SUBTITLES_BTN = "ترجمة اختيارية";
+export const SUBTITLES_BTN = "ترجمة";
+
+const API = "https://api.x.ai/v1/chat/completions";
 
 /** Proposed ENV — document only. */
 export const SUBTITLES_ENV = {
@@ -67,7 +77,7 @@ export function cuesToSrt(cues: SrtCue[]): string {
     .join("\n");
 }
 
-/** Scaffold cues from plain text / title when Whisper burn is not available. */
+/** Scaffold cues from plain text / title when model output is plain lines. */
 export function scaffoldCuesFromText(text: string, durationSec = 30): SrtCue[] {
   const cleaned = redactSecrets(text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) return [];
@@ -81,10 +91,69 @@ export function scaffoldCuesFromText(text: string, durationSec = 30): SrtCue[] {
   }));
 }
 
+export function buildTranslateSystem(): string {
+  return `أنت مترجم داخل بوت برق. اسمك «${BARQ_AI_BRAND}».
+حوّل عنوان/وصف المقطع إلى ترجمة عربية واضحة جاهزة كخطوط ترجمة.
+أخرج 3–8 أسطر عربية قصيرة فقط، سطر لكل فكرة — بدون ترقيم وبدون SRT.
+لا تختلق محتوى غير موجود في المدخلات.
+لا تذكر مزوّدًا تقنيًا.`;
+}
+
+export function buildTranslateUser(clip: LastClip): string {
+  const parts = [
+    `المنصة: ${clip.platform ?? "-"}`,
+    `العنوان: ${clip.title ?? "-"}`,
+    `الرابط: ${clip.url}`,
+  ];
+  if (clip.description?.trim()) {
+    parts.push(`الوصف:\n${clip.description.trim().slice(0, 1200)}`);
+  }
+  parts.push("ترجم إلى أسطر عربية قصيرة للعرض كترجمة.");
+  return clipAiInput(parts.join("\n"));
+}
+
+async function chatTranslate(clip: LastClip): Promise<string> {
+  const key = grokApiKey();
+  if (!key) throw new Error("no key");
+  const models = ["grok-4.5", "grok-4", "grok-3"];
+  for (const model of models) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: buildTranslateSystem() },
+            { role: "user", content: buildTranslateUser(clip) },
+          ],
+          max_tokens: Math.min(420, AI_MAX_OUTPUT_TOKENS),
+          temperature: 0.3,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) continue;
+      const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const text = (json.choices?.[0]?.message?.content ?? "").trim();
+      if (text) return redactSecrets(text);
+    } catch {
+      /* next */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error("translate failed");
+}
+
 export type SubtitlesPipelineResult = {
   optedIn: boolean;
   srt: string;
-  status: "ready_scaffold" | "burn_deferred" | "disabled" | "no_clip";
+  status: "ready_scaffold" | "burn_deferred" | "disabled" | "no_clip" | "no_key" | "error";
   message: string;
 };
 
@@ -94,7 +163,7 @@ export async function runSubtitlesPipeline(userId: number): Promise<SubtitlesPip
       optedIn: false,
       srt: "",
       status: "disabled",
-      message: "الترجمة التلقائية مطفأة من الإعدادات.",
+      message: "الترجمة مطفأة من الإعدادات.",
     };
   }
   const optedIn = isSubtitlesOptedIn(userId);
@@ -104,33 +173,53 @@ export async function runSubtitlesPipeline(userId: number): Promise<SubtitlesPip
       srt: "",
       status: "ready_scaffold",
       message:
-        "الترجمة اختيارية ⚡️\nاضغط زر التفعيل ثم أعد الطلب.\nالحرق داخل الفيديو مؤجّل (ثقيل على العامل).",
+        `ترجمة «${BARQ_AI_BRAND}» اختيارية ⚡️\n` +
+        `اضغط «تفعيل الترجمة» ثم أعد الطلب لتحصل على مسودة عربية من العنوان/الوصف.\n` +
+        `الحرق داخل الفيديو مؤجّل (ثقيل على العامل).`,
     };
   }
+
+  const gate = aiReadyGate({ enabled: AI_ENABLED, hasKey: grokReady() });
+  if (gate) {
+    return { optedIn: true, srt: "", status: "no_key", message: gate };
+  }
+
   const clip = lastClip(userId);
   if (!clip?.url) {
-    return { optedIn: true, srt: "", status: "no_clip", message: "حمّل مقطعًا أولًا." };
+    return { optedIn: true, srt: "", status: "no_clip", message: AI_NO_CLIP_AR };
   }
-  const base = clip.title || clip.url;
-  const cues = scaffoldCuesFromText(base, clip.duration && clip.duration > 0 ? clip.duration : 30);
-  const srt = cuesToSrt(cues);
-  if (subtitlesBurnEnabled()) {
+
+  try {
+    const translated = await chatTranslate(clip);
+    const duration = clip.duration && clip.duration > 0 ? clip.duration : 30;
+    const cues = scaffoldCuesFromText(translated, duration);
+    const srt = cuesToSrt(cues);
+    const header = `ترجمة «${BARQ_AI_BRAND}» ⚡️\n(مسودة من العنوان/الوصف — الحرق لاحقًا)\n\n`;
+    if (subtitlesBurnEnabled()) {
+      return {
+        optedIn: true,
+        srt,
+        status: "burn_deferred",
+        message: header + "مسار الحرق مفعّل بالإعداد لكن القصّ الثقيل مؤجّل.\n\n" + srt.slice(0, 2600),
+      };
+    }
     return {
       optedIn: true,
       srt,
-      status: "burn_deferred",
-      message:
-        "مسار الحرق مفعّل بالإعداد لكن القصّ الثقيل مؤجّل في هذه النسخة.\nإليك مسودة SRT:\n\n" +
-        srt.slice(0, 2800),
+      status: "ready_scaffold",
+      message: header + srt.slice(0, 2800),
+    };
+  } catch (err) {
+    if (String(err).includes("no key")) {
+      return { optedIn: true, srt: "", status: "no_key", message: AI_MISSING_KEY_AR };
+    }
+    return {
+      optedIn: true,
+      srt: "",
+      status: "error",
+      message: hideProviderError(err) || AI_DISABLED_AR,
     };
   }
-  return {
-    optedIn: true,
-    srt,
-    status: "ready_scaffold",
-    message:
-      "مسودة ترجمة (SRT) ⚡️\nالحرق داخل الملف لاحقًا.\n\n" + srt.slice(0, 2800),
-  };
 }
 
 export function subtitlesEnvProposalLines(): string[] {

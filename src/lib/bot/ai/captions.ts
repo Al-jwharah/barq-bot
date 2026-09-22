@@ -1,9 +1,17 @@
 /**
  * A2 — Smart caption generator: content-aware + tones فصحى / خليجي / مصري + copy.
+ * Enriches from title/description; fails loudly if API key missing.
  */
 import { clipAiInput, grokReady, hideProviderError, redactSecrets } from "../grok.server";
 import { lastClip, type LastClip } from "../session.server";
 import { AI_ENABLED, AI_MAX_OUTPUT_TOKENS, AI_TIMEOUT_MS, grokApiKey } from "../config.server";
+import {
+  AI_DISABLED_AR,
+  AI_MISSING_KEY_AR,
+  AI_NO_CLIP_AR,
+  BARQ_AI_BRAND,
+  aiReadyGate,
+} from "./copy";
 
 const API = "https://api.x.ai/v1/chat/completions";
 
@@ -36,7 +44,7 @@ const TONE_HINT: Record<CaptionTone, string> = {
 };
 
 export function buildCaptionSystem(tone: CaptionTone): string {
-  return `أنت مولّد كابشن لمنصات التواصل داخل بوت برق.
+  return `أنت مولّد كابشن لمنصات التواصل داخل بوت برق. اسمك «${BARQ_AI_BRAND}».
 ${TONE_HINT[tone]}
 أخرج بالضبط:
 1) كابشن قصير ≤ 220 حرف جاهز للنسخ
@@ -50,15 +58,17 @@ COPY>>>`;
 }
 
 export function buildCaptionUser(clip: LastClip, tone: CaptionTone): string {
-  return clipAiInput(
-    [
-      `النبرة: ${CAPTION_TONE_LABEL[tone]}`,
-      `المنصة: ${clip.platform ?? "-"}`,
-      `العنوان: ${clip.title ?? "-"}`,
-      `الرابط: ${clip.url}`,
-      "ولّد كابشن جاهز للنسخ.",
-    ].join("\n"),
-  );
+  const parts = [
+    `النبرة: ${CAPTION_TONE_LABEL[tone]}`,
+    `المنصة: ${clip.platform ?? "-"}`,
+    `العنوان: ${clip.title ?? "-"}`,
+    `الرابط: ${clip.url}`,
+  ];
+  if (clip.description?.trim()) {
+    parts.push(`الوصف:\n${clip.description.trim().slice(0, 1200)}`);
+  }
+  parts.push("ولّد كابشن جاهز للنسخ من المدخلات فقط.");
+  return clipAiInput(parts.join("\n"));
 }
 
 /** Extract copy block; fall back to full text. */
@@ -112,21 +122,20 @@ export async function generateSmartCaption(
   userId: number,
   tone: CaptionTone,
 ): Promise<{ text: string; copyText: string }> {
-  if (!AI_ENABLED) return { text: "Barq AI متوقف مؤقتًا.", copyText: "" };
-  if (!grokReady()) return { text: "Barq AI يتهيأ. جرّب الكابشن بعد لحظات.", copyText: "" };
+  const gate = aiReadyGate({ enabled: AI_ENABLED, hasKey: grokReady() });
+  if (gate) return { text: gate, copyText: "" };
   const clip = lastClip(userId);
-  if (!clip?.url) {
-    return { text: "حمّل المقطع أولًا ثم اختر نبرة الكابشن.", copyText: "" };
-  }
+  if (!clip?.url) return { text: AI_NO_CLIP_AR, copyText: "" };
   try {
     const raw = await chatCaption(buildCaptionSystem(tone), buildCaptionUser(clip, tone));
     const { copyText, caption } = extractCopyBlock(raw);
-    const header = `كابشن · ${CAPTION_TONE_LABEL[tone]} ⚡️\n(انسخ من الكتلة تحت)`;
+    const header = `كابشن «${BARQ_AI_BRAND}» · ${CAPTION_TONE_LABEL[tone]} ⚡️\n(انسخ الكتلة تحت)`;
     return {
       text: `${header}\n\n${copyText || caption}`,
       copyText: copyText || caption,
     };
   } catch (err) {
+    if (String(err).includes("no key")) return { text: AI_MISSING_KEY_AR, copyText: "" };
     return { text: hideProviderError(err), copyText: "" };
   }
 }

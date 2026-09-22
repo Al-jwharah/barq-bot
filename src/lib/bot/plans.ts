@@ -61,7 +61,7 @@ export const MAX_PLAN: SubPlan = {
   youtube: true,
   ai: true,
   priority: true,
-  blurb: "بلس + يوتيوب + Barq AI بلا حد يومي",
+  blurb: "بلس + يوتيوب + برق AI بلا حد يومي",
 };
 
 export const SEASON_PLAN: SubPlan = {

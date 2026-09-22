@@ -9,7 +9,7 @@ export const SUPPORT_BTN = "دعم فني";
 
 export const OWNER_ONLY_LABELS = new Set([
   "لوحة التحكم",
-  "Barq AI",
+  "برق AI",
   "المراقبة",
   "الإحصائيات",
   "إرسال للجميع",
@@ -17,7 +17,7 @@ export const OWNER_ONLY_LABELS = new Set([
   "القناة والمجاني",
   "أخبار القناة",
   "الإعلان",
-  "إنهاء Barq AI",
+  "إنهاء برق AI",
   "إنهاء المحادثة",
   "النماذج",
   "انشر في القناة",
@@ -35,7 +35,7 @@ export const FREE_KEYBOARD = replyKeyboard([["كيف يعمل", SUPPORT_BTN]]);
 /** Unlocked after first successful download — points / journey / achievements. */
 export const FREE_KEYBOARD_FULL = replyKeyboard([
   ["رابط مؤقت", "سجلي"],
-  ["حدّي", "Barq AI"],
+  ["حدّي", "برق AI"],
   ["رحلتي", "إنجازاتي"],
   ["أعجبني", "حسابي"],
   ["نقاطي", "كيف يعمل"],

@@ -89,7 +89,7 @@ export const MAINTENANCE_TEXT = `نعتذر عن البداية السيئة ⚡
 
 البوت تحت التطوير، وسيعود للعمل بشكل جديد قريبًا.`;
 export const BARQ_AI_DAILY = Number(env("BARQ_AI_DAILY") ?? 10) || 10;
-export const FREE_DOWNLOADS = Number(env("BARQ_FREE_DOWNLOADS") ?? 5) || 5;
+export const FREE_DOWNLOADS = Number(env("BARQ_FREE_DOWNLOADS") ?? 10) || 10;
 export const MONTHLY_CAP = Number(env("BARQ_MONTHLY_CAP") ?? 30) || 30;
 export const MONTHLY_CAP_ON = envFlag("BARQ_MONTHLY_CAP_ON", true);
 export const SUB_STARS = 50;
