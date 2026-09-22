@@ -24,3 +24,4 @@ database_url
 .database_url
 *database_url*
 .env*
+.env.local

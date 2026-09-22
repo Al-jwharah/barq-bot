@@ -105,13 +105,13 @@ export function subInvoicePayload(plan: PlanId, tgId: number): string {
 export function catalogText(live: boolean): string {
   const status = live
     ? "اضغط الخطة للدفع بنجوم تليجرام."
-    : "جاهزة — غير مفعّلة للعامة حتى تقول اطلق. المجاني الآن 5 تحميلات/يوم.";
+    : "جاهزة — غير مفعّلة للعامة حتى تقول اطلق. المجاني الآن 10 تحميلات/يوم.";
   return [
     "اشتراكات برق ⚡️",
     "",
     status,
     "",
-    "مجاني: 5 تحميلات/يوم",
+    "مجاني: 10 تحميلات/يوم",
     `${PLUS_PLAN.title} — ${PLUS_PLAN.sar} ر.س = ${PLUS_PLAN.stars} نجمة / شهر`,
     PLUS_PLAN.blurb,
     "",

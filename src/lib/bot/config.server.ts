@@ -10,6 +10,7 @@ export const KNOWN_BOOLEAN_FLAGS = [
   "BARQ_TELEGRAM_LOGIN_ENABLED",
   "BARQ_ADS_ENABLED",
   "BARQ_SUBSCRIPTIONS_UI",
+  "BARQ_SHORT_LINKS_UI",
   "BARQ_DAILY_CAP_ON",
   "BARQ_MAINTENANCE",
   "BARQ_VAULT_ARCHIVE_ENABLED",
@@ -80,6 +81,8 @@ export const TELEGRAM_LOGIN_ENABLED = envFlag("BARQ_TELEGRAM_LOGIN_ENABLED", fal
 export const ADS_ENABLED = envFlag("BARQ_ADS_ENABLED", false);
 /** Website pricing UI / Telegram deep-links. Separate from BARQ_SUBSCRIPTIONS_LIVE payments. */
 export const SUBSCRIPTIONS_UI = envFlag("BARQ_SUBSCRIPTIONS_UI", true);
+/** Advertise short-link CTAs. Default OFF while Blob store is suspended. */
+export const SHORT_LINKS_UI = envFlag("BARQ_SHORT_LINKS_UI", false);
 export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 10) || 10;
 export const DAILY_CAP_ON = envFlag("BARQ_DAILY_CAP_ON", true);
 export const MAINTENANCE = envFlag("BARQ_MAINTENANCE", false);

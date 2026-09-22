@@ -1,3 +1,4 @@
+import { SHORT_LINKS_UI } from "./config.server";
 /** Detect Vercel Blob store outages without printing tokens. */
 
 export const TGFILE_PREFIX = "tgfile/";
@@ -90,5 +91,5 @@ export function blobUploadReady(): boolean {
  * handlers should prefer lastClip before refusing.
  */
 export function shortLinksAdvertised(): boolean {
-  return blobUploadReady();
+  return SHORT_LINKS_UI && blobUploadReady();
 }
