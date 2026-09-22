@@ -1,0 +1,35 @@
+### curl -I https://abdulrhman.ai
+HTTP/2 200 
+age: 0
+cache-control: public, max-age=0, must-revalidate
+content-type: text/html; charset=utf-8
+date: Tue, 22 Sep 2026 15:32:32 GMT
+server: Vercel
+strict-transport-security: max-age=63072000
+x-vercel-cache: MISS
+x-vercel-id: cle1::fra1::rjl8f-1790091152429-8c9c6fe0ef81
+
+
+### curl -I https://barq.abdulrhman.ai
+HTTP/2 200 
+age: 0
+cache-control: public, max-age=0, must-revalidate
+content-type: text/html; charset=utf-8
+date: Tue, 22 Sep 2026 15:32:32 GMT
+server: Vercel
+strict-transport-security: max-age=63072000
+x-vercel-cache: MISS
+x-vercel-id: cle1::fra1::9p4cm-1790091152785-93c1f8c75c8f
+
+
+### curl -I https://www.abdulrhman.ai
+HTTP/2 308 
+age: 0
+cache-control: public, max-age=0, must-revalidate
+date: Tue, 22 Sep 2026 15:32:33 GMT
+location: https://barq.abdulrhman.ai/
+server: Vercel
+strict-transport-security: max-age=63072000
+x-vercel-cache: MISS
+x-vercel-id: cle1::fra1::qvtq2-1790091153155-c44cbf0f69c4
+
