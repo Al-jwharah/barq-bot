@@ -22,12 +22,20 @@ export async function probeBlobStoreOk(): Promise<boolean> {
   const token = typeof process !== "undefined" ? process.env.BLOB_READ_WRITE_TOKEN?.trim() : "";
   if (!token) return false;
   try {
-    const { list } = await import("@vercel/blob");
-    await list({ token, limit: 1 });
+    // list() can still succeed on a billing-suspended store; put() is the real signal.
+    const { put, del } = await import("@vercel/blob");
+    const pathname = "barq-health/probe";
+    await put(pathname, "ok", {
+      access: "private",
+      token,
+      allowOverwrite: true,
+      addRandomSuffix: false,
+      contentType: "text/plain",
+    });
+    await del(pathname, { token }).catch(() => undefined);
     return true;
   } catch (err) {
     if (isBlobStoreUnavailable(err)) return false;
-    // Network blip: treat as unknown→down for storage check (optional)
     console.warn("[blob] probe failed:", err instanceof Error ? err.message : "error");
     return false;
   }
