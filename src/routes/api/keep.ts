@@ -65,12 +65,20 @@ async function kickJobsIfPending() {
 async function tick() {
   const { reclaimStuckJobs } = await import("@/lib/jobs/queue.server");
   await reclaimStuckJobs().catch(() => undefined);
-  const jobs = await withTimeout(
-    drainJobs(KEEP_DRAIN_BUDGET).catch((err) => ({ error: err instanceof Error ? err.message : "jobs" })),
-    KEEP_DRAIN_TIMEOUT_MS,
-    { error: "timeout" } as { error: string },
-  );
-  await kickJobsIfPending().catch(() => undefined);
+  const { externalWorkerEnabled } = await import("@/worker/flags");
+  let jobs: unknown;
+  if (externalWorkerEnabled()) {
+    // Heavy extract lives on the always-on worker — keep only reclaims + wakes.
+    await kickJobsIfPending().catch(() => undefined);
+    jobs = { external: true, drained: "wake" };
+  } else {
+    jobs = await withTimeout(
+      drainJobs(KEEP_DRAIN_BUDGET).catch((err) => ({ error: err instanceof Error ? err.message : "jobs" })),
+      KEEP_DRAIN_TIMEOUT_MS,
+      { error: "timeout" } as { error: string },
+    );
+    await kickJobsIfPending().catch(() => undefined);
+  }
   later(
     (async () => {
       const { expireCompletedJobs } = await import("@/lib/jobs/queue.server");

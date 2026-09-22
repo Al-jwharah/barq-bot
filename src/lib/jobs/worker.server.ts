@@ -29,11 +29,12 @@ const REQUEST_CONTEXT = Symbol.for("@vercel/request-context");
 
 /**
  * Executor honesty:
- * Vercel serverless + `waitUntil` is the current executor (`/api/jobs`, `/api/keep`,
- * webhook kick via `@vercel/functions`). A dedicated always-on worker process is
- * NOT deployed. Public launch is blocked until that worker exists.
+ * Default (BARQ_EXTERNAL_WORKER off): Vercel serverless + `waitUntil` runs drain
+ * (`/api/jobs`, `/api/keep`, webhook kick via `@vercel/functions`).
+ * Architecture B (BARQ_EXTERNAL_WORKER=on): always-on worker outside Vercel
+ * (`src/worker/main.ts` on Fly/Railway/Docker) claims `download_jobs`; Vercel
+ * kick is a light wake POST to WORKER_WAKE_URL (or poll no-op). See WORKER.md.
  * `MAX_CONCURRENT_JOBS` env is honored when set; otherwise concurrency is 3.
- * This module runs inside the serverless request — it is not a separate process.
  *
  * `@vercel/functions` waitUntil is a silent no-op when
  * `Symbol.for("@vercel/request-context")` is missing (Nitro/TanStack Start).

@@ -573,6 +573,15 @@ export async function jobStats(): Promise<JobCounts> {
 }
 
 export async function kickJobWorker(jobId?: string): Promise<boolean> {
+  // Architecture B: when BARQ_EXTERNAL_WORKER=on, Vercel only wakes the always-on
+  // worker (or no-ops if the worker polls). Heavy extract never runs here.
+  const { externalWorkerEnabled } = await import("../../worker/flags");
+  if (externalWorkerEnabled()) {
+    const { kickOrWakeExternal } = await import("../../worker/wake");
+    const mode = await kickOrWakeExternal(jobId);
+    return mode === "woke" || mode === "poll";
+  }
+
   const { attachWaitUntil, drainJobs, processDownloadJob } = await import("./worker.server");
   const secret = jobSecret();
   const origin = internalOrigin();

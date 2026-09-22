@@ -62,14 +62,16 @@ test("claim heartbeat stamps worker_id and last_heartbeat_at", () => {
   assert.match(workerSrc, /worker_id \/ last_heartbeat_at/);
 });
 
-test("worker honesty: serverless waitUntil executor, no dedicated process, launch blocked", () => {
+test("worker honesty: documents serverless default and Architecture B external worker", () => {
   assert.match(workerSrc, /waitUntil/);
   assert.match(workerSrc, /Vercel serverless/);
-  assert.match(workerSrc, /dedicated always-on worker process is[\s/*]+NOT deployed/);
-  assert.match(workerSrc, /Public launch is blocked/);
-  assert.match(workerSrc, /not a separate process/);
-  assert.doesNotMatch(workerSrc, /always-on worker is deployed/);
-  assert.doesNotMatch(workerSrc, /dedicated worker process is running/);
+  assert.match(workerSrc, /BARQ_EXTERNAL_WORKER/);
+  assert.match(workerSrc, /Architecture B/);
+  assert.match(workerSrc, /src\/worker\/main\.ts/);
+  assert.match(workerSrc, /WORKER\.md/);
+  assert.match(workerSrc, /WORKER_WAKE_URL/);
+  // Cutover is flag-gated — do not claim the Fly process is already live in prod.
+  assert.doesNotMatch(workerSrc, /always-on worker is deployed in production/);
 });
 
 test("MAX_CONCURRENT_JOBS env honored if present else 3", () => {

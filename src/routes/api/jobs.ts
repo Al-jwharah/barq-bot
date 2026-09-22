@@ -5,6 +5,8 @@ import { attachWaitUntil, drainJobs, processDownloadJob } from "@/lib/jobs/worke
 import { jobStats, reclaimStuckJobs } from "@/lib/jobs/queue.server";
 import { flushDb, isDbOverloadError } from "@/lib/db";
 import { internalOrigin } from "@/lib/bot/origin";
+import { externalWorkerEnabled } from "@/worker/flags";
+import { kickOrWakeExternal } from "@/worker/wake";
 
 /**
  * Queue reliability on Hobby:
@@ -91,6 +93,17 @@ async function reclaimThenDrain(max = JOBS_DRAIN_BUDGET, depth = 0) {
   return drainJobs(max);
 }
 
+
+/** When external worker is on: reclaim (root only) + wake; no heavy drain on Vercel. */
+async function externalWakeOnly(depth: number, jobId?: string) {
+  if (depth === 0) {
+    await reclaimStuckJobs().catch(() => undefined);
+  }
+  const mode = await kickOrWakeExternal(jobId);
+  const after = await jobStats().catch(() => null);
+  return { mode, queue: after };
+}
+
 export const Route = createFileRoute("/api/jobs")({
   server: {
     handlers: {
@@ -101,6 +114,11 @@ export const Route = createFileRoute("/api/jobs")({
         }
         try {
           const depth = kickDepthFrom(request);
+          if (externalWorkerEnabled()) {
+            const light = await externalWakeOnly(depth);
+            await flushDb().catch(() => undefined);
+            return Response.json({ ok: true, external: true, ...light });
+          }
           const stats = await jobStats().catch(() => null);
           const drained = await reclaimThenDrain(JOBS_DRAIN_BUDGET, depth);
           await flushDb().catch(() => undefined);
@@ -124,6 +142,11 @@ export const Route = createFileRoute("/api/jobs")({
         }
         try {
           const depth = kickDepthFrom(request);
+          if (externalWorkerEnabled()) {
+            const light = await externalWakeOnly(depth, body.id);
+            await flushDb().catch(() => undefined);
+            return Response.json({ ok: true, external: true, result: light, queue: light.queue });
+          }
           const result = body.id
             ? await processDownloadJob(body.id)
             : await reclaimThenDrain(JOBS_DRAIN_BUDGET, depth);
