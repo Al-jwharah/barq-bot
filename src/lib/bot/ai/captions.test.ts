@@ -40,7 +40,11 @@ test("caption buttons expose three tones", () => {
 
 test("system/user builders mention tone and clip", () => {
   assert.match(buildCaptionSystem("masri"), /مصري|مصر/);
-  const user = buildCaptionUser({ url: "https://tiktok.com/x", title: "رقص" }, "fusha");
+  const user = buildCaptionUser(
+    { url: "https://tiktok.com/x", title: "رقص", description: "حفلة على السطح" },
+    "fusha",
+  );
   assert.match(user, /رقص/);
+  assert.match(user, /حفلة/);
   assert.match(user, /فصحى/);
 });

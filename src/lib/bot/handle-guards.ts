@@ -36,7 +36,7 @@ export function blocksBannedJob(isBanned: boolean, isOwner: boolean): boolean {
 const HOSTFILE_EXIT = new Set([
   "القائمة",
   "بدء",
-  "Barq AI",
+  "برق AI",
   "سجلي",
   "حدّي",
   "حدي",

@@ -252,7 +252,7 @@ export const PUBLIC_COMMANDS = [
   { command: "start", description: "بدء التحميل" },
   { command: "help", description: "كيف يعمل" },
   { command: "status", description: "حالة برق" },
-  { command: "ai", description: "Barq AI" },
+  { command: "ai", description: "برق AI" },
   { command: "short", description: "رابط مختصر 24 ساعة" },
   { command: "account", description: "حسابي على الويب" },
   { command: "invite", description: "دعوة أصدقاء" },
@@ -264,7 +264,7 @@ export const PUBLIC_COMMANDS = [
 export const OWNER_COMMANDS = [
   ...PUBLIC_COMMANDS,
   { command: "panel", description: "لوحة التحكم" },
-  { command: "grok", description: "نموذج جروك" },
+  { command: "grok", description: "برق AI" },
   { command: "watch", description: "مراقبة التحميل" },
   { command: "admin", description: "لوحة المشرف" },
 ];

@@ -62,8 +62,8 @@ export async function handleSubtitles(chatId: number, fromId: number, member: Me
 export async function handleSubtitlesToggle(chatId: number, fromId: number, member: Member) {
   const on = toggleSubtitlesOptIn(fromId);
   const note = on
-    ? "تم تفعيل الترجمة الاختيارية. اضغط «ترجمة اختيارية» مرة أخرى لمسودة SRT."
-    : "أُلغيت الترجمة الاختيارية.";
+    ? "تم تفعيل الترجمة. اضغط «ترجمة» مرة أخرى لمسودة عربية من «برق AI»."
+    : "أُلغيت الترجمة.";
   await telegram.sendMessage(
     chatId,
     `${note}\nالحالة: ${isSubtitlesOptedIn(fromId) ? "مفعّل" : "إيقاف"}`,

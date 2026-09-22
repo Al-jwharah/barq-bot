@@ -15,12 +15,19 @@ test("لخّصه button constants", () => {
   assert.equal(SUMMARIZE_CALLBACK, "ai:sum");
 });
 
-test("buildSummaryUserPayload includes title/url and optional transcript", () => {
+test("buildSummaryUserPayload includes title/description/url and optional transcript", () => {
   const payload = buildSummaryUserPayload(
-    { url: "https://x.com/a/status/1", title: "تجربة", platform: "x", duration: 42 },
+    {
+      url: "https://x.com/a/status/1",
+      title: "تجربة",
+      description: "وصف المقطع القصير",
+      platform: "x",
+      duration: 42,
+    },
     "مرحبا بالعالم",
   );
   assert.match(payload, /تجربة/);
+  assert.match(payload, /وصف المقطع/);
   assert.match(payload, /https:\/\/x\.com/);
   assert.match(payload, /مرحبا بالعالم/);
   assert.match(payload, /42/);

@@ -1,27 +1,31 @@
 /**
  * A1 — Auto-summarize (لخّصه): Arabic 2–3 sentence summary after delivery.
- * Uses xAI chat on title/url (+ optional transcript). Transcription is opt-in
- * via proposed ENV names — secrets are never set here.
+ * Uses live chat on title/description/url (+ optional transcript).
+ * Never invents scenes; fails loudly if API key missing.
  */
 import { clipAiInput, grokReady, hideProviderError, redactSecrets } from "../grok.server";
 import { lastClip, type LastClip } from "../session.server";
 import { AI_ENABLED, AI_MAX_OUTPUT_TOKENS, AI_TIMEOUT_MS, grokApiKey } from "../config.server";
+import {
+  AI_DISABLED_AR,
+  AI_MISSING_KEY_AR,
+  AI_NO_CLIP_AR,
+  BARQ_AI_BRAND,
+  aiReadyGate,
+} from "./copy";
 
 const API = "https://api.x.ai/v1/chat/completions";
 
-const SUMMARY_SYSTEM = `أنت ملخّص فيديو لبوت برق.
+const SUMMARY_SYSTEM = `أنت ملخّص فيديو داخل بوت برق. اسمك «${BARQ_AI_BRAND}».
 اكتب ملخصًا عربيًا فصيحًا في جملتين أو ثلاث فقط.
 اعتمد على العنوان والوصف والنص المستخرج إن وُجد.
 لا تختلق مشاهد أو أسماء غير موجودة في المدخلات.
-لا تذكر أنك نموذج أو xAI.`;
+لا تذكر مزوّدًا تقنيًا ولا أسماء نماذج خارجية.`;
 
 /** Proposed provider ENV names (document only — do not set secrets in code). */
 export const SUMMARIZE_ENV_PROPOSAL = {
-  /** Existing: XAI_API_KEY */
   xaiKey: "XAI_API_KEY",
-  /** Optional: enable audio→text before summarize (default off). */
   transcribeFlag: "BARQ_AI_TRANSCRIBE",
-  /** Optional: OpenAI-compatible Whisper endpoint if xAI audio unavailable. */
   whisperUrl: "BARQ_WHISPER_URL",
   whisperKey: "BARQ_WHISPER_API_KEY",
 } as const;
@@ -45,13 +49,16 @@ export function buildSummaryUserPayload(clip: LastClip, transcript?: string): st
     `العنوان: ${clip.title ?? "-"}`,
     `الرابط: ${clip.url}`,
   ];
+  if (clip.description?.trim()) {
+    parts.push(`الوصف:\n${clip.description.trim().slice(0, 1200)}`);
+  }
   if (clip.duration != null && Number.isFinite(clip.duration)) {
     parts.push(`المدة_ث: ${Math.round(clip.duration)}`);
   }
   if (transcript?.trim()) {
     parts.push(`نص_مستخرج:\n${transcript.trim().slice(0, 2500)}`);
   }
-  parts.push("لخّص المقطع بجملتين أو ثلاث.");
+  parts.push("لخّص المقطع بجملتين أو ثلاث اعتمادًا على المدخلات فقط.");
   return clipAiInput(parts.join("\n"));
 }
 
@@ -142,17 +149,17 @@ export async function maybeTranscribeClip(clip: LastClip): Promise<string | null
 }
 
 export async function summarizeLastClip(userId: number): Promise<string> {
-  if (!AI_ENABLED) return "Barq AI متوقف مؤقتًا.";
-  if (!grokReady()) return "Barq AI يتهيأ. جرّب «لخّصه» بعد لحظات.";
+  const gate = aiReadyGate({ enabled: AI_ENABLED, hasKey: grokReady() });
+  if (gate) return gate;
   const clip = lastClip(userId);
-  if (!clip?.url) {
-    return "ما عندي المقطع بعد. حمّله أولًا ثم اضغط «لخّصه».";
-  }
+  if (!clip?.url) return AI_NO_CLIP_AR;
   try {
     const transcript = await maybeTranscribeClip(clip);
     const out = await chatSummary(buildSummaryUserPayload(clip, transcript ?? undefined));
-    return out || "تعذر التلخيص الآن.";
+    if (!out) return "تعذر التلخيص الآن. أعد المحاولة.";
+    return `ملخص «${BARQ_AI_BRAND}» ⚡️\n\n${out}`;
   } catch (err) {
+    if (String(err).includes("no key")) return AI_MISSING_KEY_AR;
     return hideProviderError(err);
   }
 }

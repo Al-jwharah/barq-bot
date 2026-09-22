@@ -44,8 +44,9 @@ test("حسابي => account", () => {
   assert.equal(classifyIntent({ text: "حسابي", urls: [], hasFile: false }), "account");
 });
 
-test("Barq AI => ai", () => {
+test("Barq AI / برق AI => ai", () => {
   assert.equal(classifyIntent({ text: "Barq AI", urls: [], hasFile: false }), "ai");
+  assert.equal(classifyIntent({ text: "برق AI", urls: [], hasFile: false }), "ai");
 });
 
 test("/live @x => live", () => {

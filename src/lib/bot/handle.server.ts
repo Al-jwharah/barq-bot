@@ -208,7 +208,7 @@ function howText(free: number, channel: string, role: UserRole = "free"): string
 2. الصقه هنا
 3. اختر الجودة أو «صوت فقط» إن ظهرت، أو يصلك أفضل جودة متاحة
 
-اكتب أي شيء لـ Barq AI: لخّص الفيديو، اشرح، حوّل فكرة.
+اكتب أي شيء لـ برق AI: لخّص الفيديو، اشرح، حوّل فكرة.
 
 التحديثات: @${channel || "barq_all"}
 الدعم @${SUPPORT_USERNAME}
@@ -236,7 +236,7 @@ function startCaption(free: number, channel: string, role: UserRole): string {
     return `${BOT_DISPLAY_NAME}
 لوحة المالك جاهزة — كل الأزرار تحت.
 
-أرسل رابطًا للتحميل، أو اكتب لـ Barq AI، أو افتح لوحة التحكم.`;
+أرسل رابطًا للتحميل، أو اكتب لـ برق AI، أو افتح لوحة التحكم.`;
   }
   if (role === "sub") {
     return `${BOT_DISPLAY_NAME}
@@ -273,7 +273,7 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
     return [
       [
         { text: "لوحة التحكم", callback_data: "adm:home" },
-        { text: "Barq AI", callback_data: "adm:grok" },
+        { text: "برق AI", callback_data: "adm:grok" },
       ],
       [
         { text: "رابط مؤقت", callback_data: "go:short" },
@@ -316,7 +316,7 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
     return soft;
   }
   const rows: TgBtn[][] = [
-    [{ text: "Barq AI", callback_data: "go:ai" }],
+    [{ text: "برق AI", callback_data: "go:ai" }],
     [{ text: "رابط مؤقت", callback_data: "go:short" }],
     [
       { text: "رحلتي", callback_data: "gx:j:list" },
@@ -1579,6 +1579,7 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
   setLastClip(fromId, {
     url: result.sourceUrl,
     title: result.title ?? result.text,
+    description: result.text,
     platform: result.platform,
     mediaUrl,
     thumbnail: item.thumbnail,
@@ -1839,7 +1840,7 @@ async function handleBarqChat(chatId: number, fromId: number, text: string) {
     if (!q.ok) {
       await telegram.sendMessage(
         chatId,
-        `خلصت رسائل Barq AI اليوم (${BARQ_AI_DAILY}). التحميل يبقى متاحًا — الصق الرابط.\nيرجع العدد بعد منتصف الليل بتوقيت الرياض.`,
+        `خلصت رسائل برق AI اليوم (${BARQ_AI_DAILY}). التحميل يبقى متاحًا — الصق الرابط.\nيرجع العدد بعد منتصف الليل بتوقيت الرياض.`,
         { reply_markup: await keysFor(fromId) },
       );
       return;
@@ -1860,7 +1861,7 @@ async function handleBarqChat(chatId: number, fromId: number, text: string) {
   } catch {
     await telegram.sendMessage(
       chatId,
-      `Barq AI مشغول لحظة. حاول لاحقًا.\nالصق الرابط للتحميل مباشرة.`,
+      `«برق AI» مشغول لحظة. حاول لاحقًا.\nالصق الرابط للتحميل مباشرة.`,
       { reply_markup: await keysFor(fromId) },
     );
   }
@@ -1880,7 +1881,7 @@ async function handleOwnerChat(chatId: number, text: string, fromId: number) {
     const message = err instanceof Error ? err.message : "تعذر الرد";
     await telegram.sendMessage(
       chatId,
-      `تعذر رد Barq AI: ${message}\nلوحة التحكم ما زالت تعمل.`,
+      `تعذر رد «برق AI»: ${message}\nلوحة التحكم ما زالت تعمل.`,
       { reply_markup: keys },
     );
   }
@@ -1988,7 +1989,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   if (member.isNew && !owner && !text.startsWith("/start")) {
     await telegram.sendMessage(
       chatId,
-      `أهلًا بك في برق ⚡️\nالصق الرابط ← فيديو.\nبعد الرابط: جودة أو صوت فقط.\nBarq AI — ${BARQ_AI_DAILY} رسائل يوميًا.`,
+      `أهلًا بك في برق ⚡️\nالصق الرابط ← فيديو.\nبعد الرابط: جودة أو صوت فقط.\nبرق AI — ${BARQ_AI_DAILY} رسائل يوميًا.`,
       { reply_markup: await keysFor(fromId, member) },
     );
   }
@@ -2215,13 +2216,13 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       return;
     }
   }
-  if (text === "جروك" || text === "Barq AI" || text.startsWith("/grok")) {
+  if (text === "جروك" || text === "Barq AI" || text === "برق AI" || text.startsWith("/grok")) {
     if (owner) {
       await enterGrokMode(chatId, fromId);
       return;
     }
   }
-  if (owner && (text === "إنهاء جروك" || text === "إنهاء Barq AI" || text === "إنهاء المحادثة")) {
+  if (owner && (text === "إنهاء جروك" || text === "إنهاء Barq AI" || text === "إنهاء برق AI" || text === "إنهاء المحادثة")) {
     await exitGrokMode(chatId, fromId);
     return;
   }
@@ -2371,7 +2372,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await sendSupport(chatId, fromId, member);
     return;
   }
-  if (text === "Barq AI" || text.startsWith("/ai") || text === "جروك" || text.startsWith("/grok")) {
+  if (text === "Barq AI" || text === "برق AI" || text.startsWith("/ai") || text === "جروك" || text.startsWith("/grok")) {
     if (owner) {
       await enterGrokMode(chatId, fromId);
       return;
@@ -2513,7 +2514,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     if (route.kind === "skip") {
       await telegram.sendMessage(
         chatId,
-        "أرسل رابطًا للتحميل، أو اكتب لـ Barq AI مباشرة.",
+        "أرسل رابطًا للتحميل، أو اكتب لـ برق AI مباشرة.",
         { reply_markup: await keysFor(fromId, member) },
       );
       return;

@@ -74,7 +74,7 @@ export const MAINTENANCE_TEXT = `نعتذر عن البداية السيئة ⚡
 
 البوت تحت التطوير، وسيعود للعمل بشكل جديد قريبًا.`;
 export const BARQ_AI_DAILY = Number(env("BARQ_AI_DAILY") ?? 10) || 10;
-export const FREE_DOWNLOADS = Number(env("BARQ_FREE_DOWNLOADS") ?? 5) || 5;
+export const FREE_DOWNLOADS = Number(env("BARQ_FREE_DOWNLOADS") ?? 10) || 10;
 export const MONTHLY_CAP = Number(env("BARQ_MONTHLY_CAP") ?? 30) || 30;
 export const MONTHLY_CAP_ON = envFlag("BARQ_MONTHLY_CAP_ON", true);
 export const SUB_STARS = 50;
@@ -141,9 +141,9 @@ export const GROK_SPEEDS = ["fast", "balanced", "thorough"] as const;
 export type GrokSpeed = (typeof GROK_SPEEDS)[number];
 
 export const GROK_MODEL_META: Record<GrokModel, { label: string; hint: string }> = {
-  "grok-4.5": { label: "Grok 4.5", hint: "الأحدث والأقوى" },
-  "grok-4": { label: "Grok 4", hint: "متوازن" },
-  "grok-3": { label: "Grok 3", hint: "خفيف وسريع" },
+  "grok-4.5": { label: "برق AI 4.5", hint: "الأحدث والأقوى" },
+  "grok-4": { label: "برق AI 4", hint: "متوازن" },
+  "grok-3": { label: "برق AI 3", hint: "خفيف وسريع" },
 };
 
 export function grokModelLabel(model: string): string {

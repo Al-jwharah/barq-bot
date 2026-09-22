@@ -4,6 +4,7 @@ import {
   SUBTITLES_BTN,
   SUBTITLES_CALLBACK,
   SUBTITLES_TOGGLE_CALLBACK,
+  buildTranslateUser,
   cuesToSrt,
   formatSrtTime,
   isSubtitlesOptedIn,
@@ -15,9 +16,11 @@ import {
   subtitlesFeatureEnabled,
   toggleSubtitlesOptIn,
 } from "./subtitles.ts";
+import { AI_MISSING_KEY_AR } from "./copy.ts";
+import { setLastClip } from "../session.server.ts";
 
 test("constants and ENV proposal", () => {
-  assert.equal(SUBTITLES_BTN, "ترجمة اختيارية");
+  assert.equal(SUBTITLES_BTN, "ترجمة");
   assert.equal(SUBTITLES_CALLBACK, "ai:subs");
   assert.equal(SUBTITLES_TOGGLE_CALLBACK, "ai:subs:toggle");
   assert.match(subtitlesEnvProposalLines().join("\n"), /BARQ_AI_SUBTITLES/);
@@ -40,8 +43,20 @@ test("SRT scaffold + timing", () => {
   assert.match(srt, /مرحبا/);
 });
 
-test("pipeline respects feature flag and opt-in", async () => {
+test("translate user payload uses description", () => {
+  const u = buildTranslateUser({
+    url: "https://x.com/1",
+    title: "Hello",
+    description: "World news clip",
+  });
+  assert.match(u, /Hello/);
+  assert.match(u, /World news/);
+});
+
+test("pipeline respects feature flag; missing key fails loudly when opted in", async () => {
   delete process.env.BARQ_AI_SUBTITLES_BURN;
+  const prevKey = process.env.XAI_API_KEY;
+  delete process.env.XAI_API_KEY;
   assert.equal(subtitlesBurnEnabled(), false);
   process.env.BARQ_AI_SUBTITLES = "on";
   assert.equal(subtitlesFeatureEnabled(), true);
@@ -49,7 +64,12 @@ test("pipeline respects feature flag and opt-in", async () => {
   const off = await runSubtitlesPipeline(7);
   assert.equal(off.optedIn, false);
   setSubtitlesOptIn(7, true);
+  setLastClip(7, { url: "https://x.com/1", title: "t", description: "d" });
   const on = await runSubtitlesPipeline(7);
   assert.equal(on.optedIn, true);
-  assert.ok(on.status === "no_clip" || on.status === "ready_scaffold");
+  assert.equal(on.status, "no_key");
+  assert.match(on.message, /مفتاح الخدمة غير مضبوط/);
+  assert.equal(on.message, AI_MISSING_KEY_AR);
+  if (prevKey != null) process.env.XAI_API_KEY = prevKey;
+  else delete process.env.XAI_API_KEY;
 });
