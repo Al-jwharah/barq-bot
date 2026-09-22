@@ -29,7 +29,9 @@ test("new product routes exist on disk", () => {
 test("homepage hero avoids aspect+max-h shrink pattern (RTL gutter)", () => {
   const src = readFileSync(join(ROOT, "routes/index.tsx"), "utf8");
   assert.equal(src.includes("aspect-[9/14]"), false);
-  assert.ok(src.includes("h-[min(72vw,26rem)]"));
+  assert.ok(src.includes("aspect-[9/16]"));
+  assert.ok(src.includes("w-full"));
+  assert.equal(src.includes("max-h-[26rem]"), false);
   assert.ok(src.includes("object-cover object-center"));
   assert.ok(src.includes("منصة برق"));
   assert.ok(src.includes("خارطة الطريق"));

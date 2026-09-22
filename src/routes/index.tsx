@@ -291,10 +291,11 @@ function HomePage() {
       <section className="card-enter mt-6 w-full overflow-hidden rounded-[2rem] bg-surface shadow-[var(--shadow-card)]">
         <div className="relative w-full overflow-hidden bg-black">
           {/*
-            promo.mp4 is 720×1280 (9:16). Use full width + fixed height band with object-cover
-            so the box never shrinks narrower than the card (which caused the black left gutter in RTL).
+            promo.mp4 is 720×1280 (9:16). Use w-full + matching aspect ONLY (no max-h),
+            so the box never shrinks narrower than the card (RTL left gutter bug).
+            Desktop shortens to a landscape band with object-cover.
           */}
-          <div className="relative h-[min(72vw,26rem)] w-full sm:h-[22rem]">
+          <div className="relative aspect-[9/16] w-full sm:aspect-auto sm:h-[22rem]">
             <video
               src="/promo.mp4"
               poster="/start-hero.jpg"
@@ -304,8 +305,8 @@ function HomePage() {
               playsInline
               className="absolute inset-0 size-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/50 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 px-5 pb-5 pt-16 sm:px-7 sm:pb-7">
+            <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-bg/10" />
+            <div className="absolute inset-x-0 bottom-0 px-5 pb-5 pt-24 sm:px-7 sm:pb-7 sm:pt-16">
               <p className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-medium text-accent">
                 <Zap className="size-3" /> منصة عربية مموّلة
               </p>
@@ -335,10 +336,20 @@ function HomePage() {
             </div>
           </div>
         </div>
-        <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-[1fr_auto] sm:items-center sm:p-5">
-          <div>
-            <h2 className="font-display text-base font-semibold">تجربة الموقع</h2>
-            <p className="mt-0.5 text-sm text-muted">معاينة ← تليجرام ← ملف نظيف</p>
+        <div className="border-t border-border p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-base font-semibold">تجربة الموقع</h2>
+              <p className="mt-0.5 text-sm text-muted">معاينة ← تليجرام ← ملف نظيف</p>
+            </div>
+            <a
+              href="https://t.me/barq_ibot"
+              target="_blank"
+              rel="noreferrer"
+              className="shrink-0 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent"
+            >
+              جرب البوت
+            </a>
           </div>
           <video
             src="/gifs/barq-bolt.mp4"
@@ -346,7 +357,7 @@ function HomePage() {
             muted
             loop
             playsInline
-            className="aspect-square w-full max-w-[7.5rem] justify-self-end rounded-2xl object-cover outline outline-1 -outline-offset-1 outline-fg/10 sm:max-w-[8.5rem]"
+            className="mt-4 aspect-[16/9] w-full rounded-2xl object-cover outline outline-1 -outline-offset-1 outline-fg/10"
           />
         </div>
       </section>
