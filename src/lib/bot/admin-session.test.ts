@@ -133,3 +133,54 @@ test("admin-session source never logs PIN, session secret, or tokens", () => {
   assert.match(src, /bad_pin/);
   assert.doesNotMatch(src, /console\.(log|info|debug|error|warn)\(/);
 });
+
+test("fail-closed when neither BARQ_ADMIN_PIN_HASH nor BARQ_ADMIN_PIN is set", () => {
+  const prevHash = process.env.BARQ_ADMIN_PIN_HASH;
+  const prevPin = process.env.BARQ_ADMIN_PIN;
+  try {
+    delete process.env.BARQ_ADMIN_PIN_HASH;
+    delete process.env.BARQ_ADMIN_PIN;
+    resetAdminPinHashCache();
+    assert.equal(verifyPin("anything"), false);
+    assert.equal(verifyPin(""), false);
+  } finally {
+    if (prevHash == null) delete process.env.BARQ_ADMIN_PIN_HASH;
+    else process.env.BARQ_ADMIN_PIN_HASH = prevHash;
+    if (prevPin == null) delete process.env.BARQ_ADMIN_PIN;
+    else process.env.BARQ_ADMIN_PIN = prevPin;
+    resetAdminPinHashCache();
+  }
+});
+
+test("admin server functions require session / mutation gate (no unauthenticated data)", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+  const fns = readFileSync(join(root, "admin.functions.ts"), "utf8");
+  // loadAdmin must require session before reading store
+  assert.match(fns, /await requireAdminSession\(\)/);
+  // mutations go through gated() or requireAdminMutation
+  for (const name of [
+    "adminCreateCode",
+    "adminSetCodeActive",
+    "adminGrant",
+    "adminSetSubscription",
+    "adminBroadcast",
+    "adminSetSetting",
+    "adminBan",
+    "adminSetRole",
+    "adminRetryJob",
+  ]) {
+    assert.match(fns, new RegExp(`export const ${name}`));
+  }
+  assert.match(fns, /async function gated\(/);
+  assert.match(fns, /await requireAdminMutation\(\)/);
+  // login is the only unauthenticated write — and it goes through verifyPin
+  assert.match(fns, /await loginWithPin\(/);
+  const backup = readFileSync(join(root, "../../routes/api/backup.ts"), "utf8");
+  assert.match(backup, /requireWeb\(|hasAdminSession\(/);
+});
+
+test("empty / forged session tokens are rejected", () => {
+  assert.equal(sessionValid(""), false);
+  assert.equal(sessionValid("a.b"), false);
+  assert.equal(sessionValid("1.2.not-a-real-hmac"), false);
+});

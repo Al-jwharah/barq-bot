@@ -192,7 +192,8 @@ export const adminSetSetting = createServerFn({ method: "POST" })
     const key = typeof body.key === "string" ? body.key.trim() : "";
     let value = typeof body.value === "string" ? body.value.trim() : "";
     if (key === "porn_filter") {
-      return { key, value: "off" };
+      // Domain/NSFW + CSAM blocklists are wired pre-extract in code; setting is informational.
+      return { key, value: "on" };
     }
     if (TOGGLE_KEYS.has(key)) {
       if (value !== "on" && value !== "off") throw new Error("القيمة on أو off");

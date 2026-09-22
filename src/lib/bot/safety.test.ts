@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import {
+  assertPreExtractBlocklist,
   domainVerdict,
   isBanKind,
   matchCsamKeywords,
@@ -9,40 +13,38 @@ import {
   matchPornDomain,
   matchPornKeywords,
   matchWomenKeywords,
+  MediaBlockedError,
   metadataVerdict,
   parseGrokVerdict,
   userBlockMessage,
 } from "./safety.ts";
 
-test("adult porn domains and keywords no longer block", () => {
-  assert.equal(matchPornDomain("https://www.pornhub.com/view_video.php?viewkey=1"), null);
-  assert.equal(matchPornDomain("https://m.xvideos.com/video123"), null);
-  assert.equal(matchPornKeywords("Brazzers official scene"), null);
-  assert.equal(matchPornKeywords("فيلم سكس كامل"), null);
-  assert.equal(matchPornKeywords("nsfw 18+ onlyfans"), null);
-  assert.equal(domainVerdict("https://www.pornhub.com/video"), null);
-  assert.equal(
-    metadataVerdict({ url: "https://example.com/a", title: "nsfw 18+ onlyfans" }),
-    null,
-  );
+test("porn domains and NSFW keywords block", () => {
+  assert.ok(matchPornDomain("https://www.pornhub.com/view_video.php?viewkey=1"));
+  assert.ok(matchPornDomain("https://m.xvideos.com/video123"));
+  assert.ok(matchPornDomain("https://cdn.phncdn.com/videos/a.mp4"));
+  assert.ok(matchPornKeywords("Brazzers official scene"));
+  assert.ok(matchPornKeywords("فيلم سكس كامل"));
+  assert.ok(matchPornKeywords("nsfw 18+ onlyfans"));
+  const d = domainVerdict("https://www.pornhub.com/video");
+  assert.equal(d?.block, true);
+  assert.equal(d?.kind, "domain");
+  const m = metadataVerdict({ url: "https://example.com/a", title: "nsfw 18+ onlyfans" });
+  assert.equal(m?.block, true);
+  assert.equal(m?.kind, "nsfw");
 });
 
-test("music and women soft blocks are off", () => {
+test("music and women soft blocks stay off", () => {
   assert.equal(matchMusicDomain("https://soundcloud.com/artist/track"), null);
   assert.equal(matchMusicKeywords("أغنية جديدة 2026"), null);
   assert.equal(matchWomenKeywords("رقص بنات تيك توك"), null);
   assert.equal(userBlockMessage("music"), "");
-  assert.equal(userBlockMessage("nsfw"), "");
   const song = parseGrokVerdict(
     '{"block":true,"kind":"music","confidence":0.95,"evidence_ar":"أغنية"}',
   );
   assert.equal(song?.block, false);
-  const nsfw = parseGrokVerdict(
-    '{"block":true,"kind":"nsfw","confidence":0.95,"evidence_ar":"محتوى +18"}',
-  );
-  assert.equal(nsfw?.block, false);
-  assert.equal(isBanKind("nsfw"), false);
-  assert.equal(isBanKind("porn_film"), false);
+  assert.equal(isBanKind("music"), false);
+  assert.equal(isBanKind("women"), false);
 });
 
 test("CSAM keywords and verdicts still block", () => {
@@ -59,11 +61,53 @@ test("CSAM keywords and verdicts still block", () => {
   assert.equal(grok?.kind, "csam");
 });
 
-test("ordinary comedy / social hosts stay clear", () => {
+test("Grok NSFW / domain blocks; comedy stays clear", () => {
+  const nsfw = parseGrokVerdict(
+    '{"block":true,"kind":"nsfw","confidence":0.95,"evidence_ar":"محتوى +18"}',
+  );
+  assert.equal(nsfw?.block, true);
+  assert.equal(isBanKind("nsfw"), true);
+  assert.equal(isBanKind("porn_film"), true);
+  assert.equal(isBanKind("domain"), true);
+  assert.ok(userBlockMessage("nsfw").length > 0);
   assert.equal(matchPornDomain("https://www.youtube.com/watch?v=abc"), null);
   assert.equal(matchPornDomain("https://tiktok.com/@x/video/1"), null);
   const allow = parseGrokVerdict(
     '{"block":false,"kind":"comedy","confidence":0.9,"evidence_ar":"سكرت كوميدي"}',
   );
   assert.equal(allow?.block, false);
+});
+
+test("assertPreExtractBlocklist throws MediaBlockedError before extract", () => {
+  assert.throws(
+    () => assertPreExtractBlocklist("https://www.pornhub.com/view_video.php?viewkey=1"),
+    (err: unknown) => err instanceof MediaBlockedError && err.kind === "domain",
+  );
+  assert.throws(
+    () => assertPreExtractBlocklist("https://example.com/watch/childporn-archive"),
+    (err: unknown) => err instanceof MediaBlockedError && err.kind === "csam",
+  );
+  assert.doesNotThrow(() => assertPreExtractBlocklist("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+  assert.doesNotThrow(() => assertPreExtractBlocklist("https://x.com/user/status/123"));
+});
+
+test("extractMedia source calls assertPreExtractBlocklist before unwrap/extract", () => {
+  const root = dirname(fileURLToPath(import.meta.url));
+  const extractSrc = readFileSync(join(root, "../media/extract.ts"), "utf8");
+  assert.match(extractSrc, /assertPreExtractBlocklist/);
+  const fnIdx = extractSrc.indexOf("export async function extractMedia");
+  assert.ok(fnIdx >= 0, "extractMedia export present");
+  const body = extractSrc.slice(fnIdx);
+  const gateIdx = body.indexOf("assertPreExtractBlocklist(raw)");
+  const unwrapIdx = body.indexOf("await unwrap(raw)");
+  const platformCall = body.indexOf("extractForPlatform(url");
+  assert.ok(gateIdx >= 0, "gate called on raw url");
+  assert.ok(gateIdx < unwrapIdx, "blocklist before unwrap");
+  assert.ok(gateIdx < platformCall, "blocklist before platform extract call");
+  const workerSrc = readFileSync(join(root, "../jobs/worker.server.ts"), "utf8");
+  const safeIdx = workerSrc.indexOf("await assertSafeMedia(job.url)");
+  const extractIdx = workerSrc.indexOf("await extractMedia(job.url)");
+  assert.ok(safeIdx >= 0 && extractIdx > safeIdx, "worker assertSafeMedia before extractMedia");
+  const handleSrc = readFileSync(join(root, "handle.server.ts"), "utf8");
+  assert.match(handleSrc, /domainVerdict\(url\)/);
 });
