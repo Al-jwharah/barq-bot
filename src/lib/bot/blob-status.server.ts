@@ -61,7 +61,7 @@ export function tgFileStorageKey(fileId: string): string {
 
 /** User-facing Arabic when Blob cannot host uploads. */
 export const BLOB_SUSPENDED_AR =
-  "تخزين الملفات متوقف مؤقتًا (Vercel Blob معلّق). جرّب لاحقًا أو الصق رابط فيديو للتحميل.";
+  "تخزين الملفات السحابي متوقف مؤقتًا. رفع ملف لرابط مختصر غير متاح الآن — الصق رابط فيديو للتحميل، أو أعد المحاولة لاحقًا.";
 
 export const SHORT_LINK_HIDDEN_AR =
   "الرابط المختصر متوقف مؤقتًا (التخزين السحابي معلّق).\nحمّل من رابط المنصة كالمعتاد — نعيد تفعيله بعد إصلاح التخزين.";
