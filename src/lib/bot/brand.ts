@@ -34,26 +34,17 @@ export function platformLabelAr(platform?: string | null): string {
   }
 }
 
-export const CLIP_LINES = [
-  "برق ⚡️ وصلك المقطع",
-  "تم ⚡️ بأعلى جودة",
-  "برق ⚡️ جاهز عندك",
-];
+export const CLIP_LINES = ["برق ⚡️"];
 
 export function clipCaption(
   username?: string | null,
   _kind: "video" | "photo" | "audio" = "video",
   _platform?: string | null,
   _sourceUrl?: string | null,
-  seed?: number,
+  _seed?: number,
 ): string {
   const handle = (username || BOT_USERNAME).replace(/^@/, "").trim() || BOT_USERNAME;
-  const n = CLIP_LINES.length;
-  const i =
-    seed != null && Number.isFinite(seed)
-      ? ((Math.trunc(seed) % n) + n) % n
-      : Math.floor(Math.random() * n);
-  return `${CLIP_LINES[i]}
+  return `برق ⚡️
 abdulrhman.ai
 @${handle}`;
 }

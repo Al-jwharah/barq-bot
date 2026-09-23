@@ -31,13 +31,8 @@ export const SUB_KEYBOARD = replyKeyboard([
 ]);
 
 export const FREE_KEYBOARD = replyKeyboard([
-  ["رابط مؤقت", "رفع ملف"],
-  ["لخّصه", "كابشن"],
-  ["سجلي", "حدّي"],
-  ["Barq AI", "رحلتي"],
-  ["إنجازاتي", "أعجبني"],
-  ["حسابي", "نقاطي"],
-  ["كيف يعمل"],
+  ["لخّصه وكابشن", "حسابي"],
+  ["الموقع", "كيف يعمل"],
 ]);
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";

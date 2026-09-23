@@ -782,7 +782,15 @@ async function sendStart(chatId: number, member: Member) {
     await sql`update user_stats set onboarding_step = -1 where tg_id = ${String(fromId)}`.catch(() => undefined);
   }
   const caption = startCaption(s.freeDownloads, s.requiredChannel, role);
-  await telegram.sendMessage(chatId, caption, { reply_markup: await keysFor(fromId, member) });
+  const keys = await keysFor(fromId, member);
+  try {
+    await telegram.sendPhotoUrl(chatId, "https://abdulrhman.ai/brand-mark.jpg", {
+      caption,
+      reply_markup: keys,
+    });
+  } catch {
+    await telegram.sendMessage(chatId, caption, { reply_markup: keys });
+  }
 }
 
 async function sendSubInvoice(chatId: number, fromId?: number) {
@@ -2105,8 +2113,15 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       return;
     }
   }
-  if (text === "لخّصه" || text === "لخصه" || text === "تلخيص" || text === "تحليل الفيديو") {
+  if (text === "لخّصه وكابشن" || text === "لخّصه" || text === "لخصه" || text === "تلخيص" || text === "تحليل الفيديو") {
     await telegram.sendChatAction(chatId, "typing");
+    if (text === "لخّصه وكابشن") {
+      const { packClip } = await import("./analyze.server");
+      await telegram.sendMessage(chatId, (await packClip(fromId)).slice(0, 4000), {
+        reply_markup: await keysFor(fromId, member),
+      });
+      return;
+    }
     await handleAnalyze(chatId, fromId, member);
     return;
   }
@@ -2306,6 +2321,12 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await handlePoints(chatId, fromId);
     return;
   }
+  if (text === "الموقع") {
+    await telegram.sendMessage(chatId, "الموقع\nhttps://abdulrhman.ai\nالصق الرابط هناك إذا كان المقطع كبيرًا.", {
+      reply_markup: await keysFor(fromId, member),
+    });
+    return;
+  }
   if (text === "حسابي" || text.startsWith("/account")) {
     await handleAccount(chatId, fromId);
     return;
@@ -2428,22 +2449,8 @@ function chatIdFromUpdate(update: TgUpdate): number | null {
   );
 }
 
-async function ackStart(update: TgUpdate): Promise<boolean> {
-  const msg = update.message;
-  if (!msg || msg.chat.type !== "private") return false;
-  const text = (msg.text ?? "").trim();
-  if (!/^\/start(?:@\w+)?/i.test(text) && text !== "القائمة" && text !== "بدء") return false;
-  const chatId = msg.chat.id;
-  const fromId = msg.from?.id ?? 0;
-  const owner = isOwnerId(fromId) || isOwnerId(chatId);
-  await telegram.sendMessage(
-    chatId,
-    owner
-      ? `${BOT_DISPLAY_NAME}\nأنت المالك. أرسل رابط أو افتح لوحة التحكم.`
-      : "برق ⚡️ الصق الرابط واستلم الفيديو.\nتيك توك · إنستغرام · إكس · يوتيوب",
-    { reply_markup: owner ? OWNER_KEYBOARD : FREE_KEYBOARD },
-  );
-  return true;
+async function ackStart(_update: TgUpdate): Promise<boolean> {
+  return false;
 }
 
 export async function handleUpdate(update: TgUpdate) {

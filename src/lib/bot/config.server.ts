@@ -46,8 +46,8 @@ export const BOT_USERNAME = env("BARQ_BOT_USERNAME") ?? "barq_ibot";
 export const BOT_DISPLAY_NAME = "برق ⚡️ لتحميل الفيديوهات";
 export const BOT_BRAND = "برق";
 export const BOT_DESCRIPTION =
-  "برق ⚡️ الصق الرابط واستلم الفيديو.\nتيك توك · إنستغرام · إكس · يوتيوب\nجبت كنتاكي؟ تعال حمّل 😂🍗\n\nالدعم @i_2169 · البريد info@aljwharah.ai";
-export const BOT_SHORT = "برق ⚡️ الصق الرابط. الفيديو عندك. الكنتاكي بعدك 🍗";
+  "برق ⚡️ الصق الرابط ويصلك المقطع.\nالكبير يتحمّل من الموقع مباشرة.\nتحت كل ملف: لخّصه وكابشن بالذكاء.\n\nabdulrhman.ai\nالدعم @i_2169";
+export const BOT_SHORT = "برق ⚡️ الصق الرابط. الكبير من الموقع.";
 
 export const TELEGRAM_MAX_UPLOAD = 49 * 1024 * 1024;
 export const TELEGRAM_MAX_URL = 19 * 1024 * 1024;
