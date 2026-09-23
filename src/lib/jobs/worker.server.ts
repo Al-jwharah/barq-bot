@@ -1,7 +1,8 @@
 import { waitUntil } from "@vercel/functions";
 import { extractMedia } from "../media/extract";
+import type { ExtractResult } from "../media/types";
 import { extractWithYtdlp } from "../media/ytdlp";
-import { isOwnerId, SUPPORT_URL } from "../bot/config.server";
+import { SUPPORT_URL } from "../bot/config.server";
 import {
   assertSafeMedia,
   deliver,
@@ -11,8 +12,7 @@ import {
 } from "../bot/handle.server";
 import { MediaBlockedError } from "../bot/safety";
 import { logEvent, requestId } from "../bot/observability.server";
-import { downloadAccess } from "../bot/settings.server";
-import { bumpDownload, getMember, logDownload } from "../bot/store.server";
+import { bumpDownload, logDownload } from "../bot/store.server";
 import { inlineKeyboard, telegram } from "../bot/telegram.server";
 import { markError, markProcessed } from "../bot/state";
 import { claimNextJob, finishJob, retryOrFail, applyJobQuota, markJobUploading, scheduleJobRetry, getJob, type DownloadJob } from "./queue.server";
@@ -22,6 +22,29 @@ import { userFailMessage, userRetryMessage } from "./retry-policy";
 import { emit } from "../events/bus";
 
 void import("../events/download-completed");
+
+function forceTikTokFile(result: ExtractResult): ExtractResult {
+  if (result.platform !== "tiktok") return result;
+  const id = result.id && /^\d{8,30}$/.test(String(result.id)) ? String(result.id) : "";
+  if (!id) return result;
+  const hd = `https://www.tikwm.com/video/media/hdplay/${id}.mp4`;
+  const play = `https://www.tikwm.com/video/media/play/${id}.mp4`;
+  return {
+    ...result,
+    items: result.items.map((item) =>
+      item.kind === "photo"
+        ? item
+        : {
+            ...item,
+            url: hd,
+            variants: [
+              { url: hd, quality: "HD", contentType: "video/mp4" },
+              { url: play, quality: "أصل", contentType: "video/mp4" },
+            ],
+          },
+    ),
+  };
+}
 
 const REQUEST_CONTEXT = Symbol.for("@vercel/request-context");
 
@@ -135,25 +158,27 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     return "ok";
   }
   await editStatus(chatId, mid, progressStatus("extract"));
-  let result = (await cachedExtract(job.url).catch(() => null)) ?? (await extractMedia(job.url));
+  let result = await cachedExtract(job.url).catch(() => null);
+  const cachedMedia = result?.items?.[0]?.url || "";
+  if (!result || /tiktokcdn|tiktokv\.com|byteicdn|tikcdn\.io/i.test(cachedMedia)) {
+    result = await extractMedia(job.url);
+  }
+  result = forceTikTokFile(result);
   await saveExtractCache(job.url, result).catch(() => undefined);
   await assertSafeMedia(job.url, result);
-  const member = await getMember(fromId);
-  const quota = member ? await downloadAccess(member) : { subscribed: false };
-  const stamp = !isOwnerId(fromId) && !quota.subscribed;
   const live = await getJob(job.id);
   if (live?.status === "cancelled") throw new Error("cancelled");
   await markJobUploading(job.id).catch(() => undefined);
   await editStatus(chatId, mid, progressStatus("upload"));
   let ids: number[] = [];
   try {
-    ids = await deliver(chatId, result, stamp, fromId);
+    ids = await deliver(chatId, result, false, fromId);
   } catch (sendErr) {
     if (sendErr instanceof MediaBlockedError) throw sendErr;
     if (result.items.length) throw sendErr;
     result = await extractWithYtdlp(job.url, result.platform);
     await assertSafeMedia(job.url, result);
-    ids = await deliver(chatId, result, stamp, fromId);
+    ids = await deliver(chatId, result, false, fromId);
   }
   const { archiveDelivered } = await import("../bot/vault.server");
   const media = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
@@ -188,7 +213,6 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
 export async function processDownloadJob(id?: string): Promise<{ id?: string; status: string }> {
   const rid = requestId();
   const started = Date.now();
-  // claimNextJob uses FOR UPDATE SKIP LOCKED on postgres and stamps worker_id / last_heartbeat_at.
   const job = await claimNextJob(id);
   if (!job) return { status: "empty" };
   const chatId = Number(job.chat_id);
@@ -276,20 +300,23 @@ export async function processDownloadJob(id?: string): Promise<{ id?: string; st
       const { markTelegramUpdateFailed } = await import("../bot/telegram-updates.server");
       await markTelegramUpdateFailed(job.update_id, shown).catch(() => undefined);
     }
+    const page = `https://abdulrhman.ai/?url=${encodeURIComponent(job.url)}`;
+    const withLink = `${shown}\n\nإذا ما نزل هنا، افتحه من الموقع:\n${page}`;
     const failKb = inlineKeyboard([
       [
         { text: "إعادة المحاولة", callback_data: `job:retry:${job.id}` },
-        { text: "الدعم", url: SUPPORT_URL },
+        { text: "تحميل من الموقع", url: page },
       ],
+      [{ text: "الدعم", url: SUPPORT_URL }],
     ]);
     if (job.status_message_id) {
       await telegram
-        .editMessageText(chatId, job.status_message_id, shown, { reply_markup: failKb })
+        .editMessageText(chatId, job.status_message_id, withLink, { reply_markup: failKb })
         .catch(async () => {
-          await editStatus(chatId, job.status_message_id, shown);
+          await editStatus(chatId, job.status_message_id, withLink);
         });
     } else {
-      await telegram.sendMessage(chatId, shown, { reply_markup: failKb });
+      await telegram.sendMessage(chatId, withLink, { reply_markup: failKb });
     }
     return { id: job.id, status: "failed" };
   }
