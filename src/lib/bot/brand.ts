@@ -34,19 +34,10 @@ export function platformLabelAr(platform?: string | null): string {
   }
 }
 
-export const FUN_SIGNATURES = [
-  "⚡ تم التحميل بنجاح\nبس باقي عليك تطلب كنتاكي 😂🍗",
-  "برق ⚡️\nخدمتك كاملة… باقي نجيب لك كنتاكي 🍗🤣",
-  "نزلنا لك الفيديو ⚡️\nلا تزيد الطلبات علينا… ما تبي كنتاكي بعد؟ 😂",
-  "برق ⚡️ تحميل سريع بدون تعقيد\nوالكنتاكي خارج الخدمة 😂🍗",
-  "برق ⚡️\nما تبي كنتاكي بعد؟ 🍗",
-  "وصل الفيديو قبل الدليفري ⚡️\nالكنتاكي يتأخر، برق لا 😂",
-  "برق_يغنيك ⚡️\nحمّلنا المقطع… الدجاج عليك 🍗",
-  "تم ⚡️\nلو كان فيه عرض كنتاكي مع التحميل كنا حطيناه 😂",
-  "برق ⚡️ جاهز\nالفيديو عندك، الباقي فروج 🐓",
-  "سكّبناها لك ⚡️\nبدون طابور وبدون كنتاكي إجباري 😂🍗",
-  "برق ⚡️\nأسرع من الطلب، وأظرف من الجوع 🤣",
-  "تم التسليم ⚡️\nلو تبي الدجاج، التوصيل الثاني عليك 🍗😂",
+export const CLIP_LINES = [
+  "برق ⚡️ وصلك المقطع",
+  "تم ⚡️ بأعلى جودة",
+  "برق ⚡️ جاهز عندك",
 ];
 
 export function clipCaption(
@@ -57,17 +48,27 @@ export function clipCaption(
   seed?: number,
 ): string {
   const handle = (username || BOT_USERNAME).replace(/^@/, "").trim() || BOT_USERNAME;
-  const n = FUN_SIGNATURES.length;
+  const n = CLIP_LINES.length;
   const i =
     seed != null && Number.isFinite(seed)
       ? ((Math.trunc(seed) % n) + n) % n
       : Math.floor(Math.random() * n);
-  return `${FUN_SIGNATURES[i]}
-
-الموقع
-https://abdulrhman.ai
-
+  return `${CLIP_LINES[i]}
+abdulrhman.ai
 @${handle}`;
+}
+
+export function clipActionRows(): { text: string; url?: string; callback_data?: string }[][] {
+  return [
+    [
+      { text: "لخّصه", callback_data: "ai:analyze" },
+      { text: "كابشن", callback_data: "ai:studio" },
+    ],
+    [
+      { text: "رابط مؤقت", callback_data: "go:short" },
+      { text: "الموقع", url: "https://abdulrhman.ai" },
+    ],
+  ];
 }
 
 export const TRY_BOT_LABEL = "جرب البوت الآن ⚡️";

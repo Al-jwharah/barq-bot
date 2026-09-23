@@ -1,21 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { botDeepLink, channelUrl, clipCaption, FUN_SIGNATURES, normalizeChannel, TRY_BOT_LABEL } from "./brand";
+import { botDeepLink, channelUrl, clipCaption, CLIP_LINES, normalizeChannel, TRY_BOT_LABEL } from "./brand";
 
 describe("clipCaption", () => {
-  it("rotates funny signatures and never includes the source url", () => {
+  it("uses a short signature and the site, never the source url", () => {
     const a = clipCaption("barq_ibot", "video", "tiktok", "https://vt.tiktok.com/x", 0);
     const b = clipCaption("barq_ibot", "video", "tiktok", "https://vt.tiktok.com/x", 1);
     assert.match(a, /@barq_ibot/);
-    assert.match(b, /@barq_ibot/);
+    assert.match(a, /abdulrhman\.ai/);
     assert.notEqual(a, b);
-    assert.equal(FUN_SIGNATURES.length >= 8, true);
-    assert.ok(FUN_SIGNATURES.some((s) => s.includes("كنتاكي")));
-    for (let i = 0; i < FUN_SIGNATURES.length; i += 1) {
+    assert.equal(CLIP_LINES.length >= 3, true);
+    assert.equal(CLIP_LINES.some((s) => /كنتاكي|😂/.test(s)), false);
+    for (let i = 0; i < CLIP_LINES.length; i += 1) {
       const cap = clipCaption("barq_ibot", "video", "tiktok", "https://vt.tiktok.com/x", i);
-      assert.doesNotMatch(cap, /https?:/);
       assert.doesNotMatch(cap, /vt\.tiktok/);
-      assert.match(cap, /@barq_ibot/);
+      assert.doesNotMatch(cap, /😂|كنتاكي/);
     }
   });
 });

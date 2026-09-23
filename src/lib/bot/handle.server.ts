@@ -4,7 +4,7 @@ import { extractMedia } from "../media/extract";
 import { headSize, mediaHeaders, isTikcdnHost, telegramUrlSendBlocked } from "../media/http";
 import type { ExtractResult, MediaItem, MediaVariant } from "../media/types";
 import { supportedDownloadPlatform, detectPlatform } from "../media/urls";
-import { botDeepLink, clipCaption, platformLabelAr, TRY_BOT_LABEL } from "./brand";
+import { botDeepLink, clipActionRows, clipCaption, platformLabelAr, TRY_BOT_LABEL } from "./brand";
 import {
   BOT_DISPLAY_NAME,
   BOT_USERNAME,
@@ -418,7 +418,8 @@ async function sendVideoItem(
   }
   const capKind = item.kind === "audio" ? "audio" : "video";
   const cap = withCaption ? signatureCaption(capKind, result.platform, result.sourceUrl) : undefined;
-  const extra: Record<string, unknown> = {};
+  const markup = inlineKeyboard(clipActionRows());
+  const extra: Record<string, unknown> = { reply_markup: markup };
   if (item.kind !== "audio") extra.supports_streaming = true;
   if (cap) extra.caption = cap;
   if (filled.width) extra.width = filled.width;
@@ -481,7 +482,7 @@ async function sendVideoItem(
         }
       }
       if (blob.size > TELEGRAM_MAX_UPLOAD) continue;
-      const fileExtra: Record<string, string> = {};
+      const fileExtra: Record<string, string> = { reply_markup: JSON.stringify(markup) };
       if (cap) fileExtra.caption = cap;
       if (item.kind === "gif") {
         await sendAnimationFile(chatId, blob, filename(result, item, v.quality), fileExtra);
@@ -515,7 +516,8 @@ async function sendPhotoItem(
   stamp: boolean,
 ): Promise<number | null> {
   const cap = withCaption ? signatureCaption("photo", result.platform, result.sourceUrl) : undefined;
-  const photoExtra: Record<string, unknown> = {};
+  const markup = inlineKeyboard(clipActionRows());
+  const photoExtra: Record<string, unknown> = { reply_markup: markup };
   if (cap) photoExtra.caption = cap;
   if (!stamp) {
     try {
@@ -776,19 +778,19 @@ async function sendSubInvoice(chatId: number, fromId?: number) {
 }
 
 async function sendPaywall(chatId: number, fromId: number) {
-  const { subscriptionsLive, sendPlanCatalog } = await import("./plans.server");
-  if (!subscriptionsLive()) {
-    await telegram.sendMessage(
-      chatId,
-      "وصلت حد اليوم (5 مقاطع).\nزيادة العدد عبر الإعلانات قريباً.",
-      { reply_markup: await keysFor(fromId) },
-    );
-    return;
-  }
-  await telegram.sendMessage(chatId, "انتهت التحميلات المجانية. اختر اشتراكًا:", {
-    reply_markup: await keysFor(fromId),
-  });
-  await sendPlanCatalog(chatId, fromId);
+  const seen = Number((await getSettings())[`ad_steps_${fromId}`] || 0) || 0;
+  const left = Math.max(0, 3 - seen);
+  await telegram.sendMessage(
+    chatId,
+    `خلصت ٥ تحميلات اليوم.\nشاهد ٣ إعلانات ويرجع لك ٥.\nالمتبقي: ${left} من ٣.\n\nأو اشترك بالنجوم ويصير التحميل بلا حد.`,
+    {
+      reply_markup: inlineKeyboard([
+        [{ text: "افتح الإعلان", url: "https://abdulrhman.ai" }],
+        [{ text: `تمّت المشاهدة ${Math.min(seen, 3)}/3`, callback_data: "go:adstep" }],
+        [{ text: "اشترك بالنجوم", callback_data: "go:sub" }],
+      ]),
+    },
+  );
 }
 
 async function sendSupport(chatId: number, fromId: number, member?: Member | null) {
@@ -883,13 +885,30 @@ async function claimAdBonus(chatId: number, fromId: number, member: Member) {
     }
   }
   const s = await botSettings();
-  await resetDownloads(fromId);
+  const seen = Number((await getSettings())[`ad_steps_${fromId}`] || 0) || 0;
+  const next = seen + 1;
+  if (next < 3) {
+    await setSetting(`ad_steps_${fromId}`, String(next));
+    await telegram.sendMessage(
+      chatId,
+      `انحسبت مشاهدة ${next} من ٣.\nباقي ${3 - next}، ثم ترجع ٥ تحميلات.`,
+      {
+        reply_markup: inlineKeyboard([
+          [{ text: "افتح الإعلان", url: "https://abdulrhman.ai" }],
+          [{ text: `تمّت المشاهدة ${next}/3`, callback_data: "go:adstep" }],
+          [{ text: "اشترك بالنجوم", callback_data: "go:sub" }],
+        ]),
+      },
+    );
+    return;
+  }
+  await setSetting(`ad_steps_${fromId}`, "0");
+  const { grantBonusDownloads } = await import("./product.server");
+  await grantBonusDownloads(fromId, s.freeDownloads || 5);
   await setSetting(`ad_last_${fromId}`, new Date().toISOString());
-  await telegram.sendMessage(
-    chatId,
-    `تم تجديد ${s.freeDownloads} تحميلات مجانية. أرسل الرابط الآن.`,
-    { reply_markup: FREE_KEYBOARD },
-  );
+  await telegram.sendMessage(chatId, "رجعت لك ٥ تحميلات. أرسل الرابط.", {
+    reply_markup: await keysFor(fromId, member),
+  });
 }
 
 async function handleAdminCommand(chatId: number, text: string, fromId: number) {
@@ -1396,7 +1415,7 @@ async function handleCallback(cb: TgCallbackQuery) {
     await sendAdOffer(targetChat, fromId, member);
     return;
   }
-  if (data === "go:adok") {
+  if (data === "go:adok" || data === "go:adstep") {
     await claimAdBonus(targetChat, fromId, member);
     return;
   }
@@ -1451,31 +1470,8 @@ function pickPlayUrl(result: ExtractResult): string | undefined {
   return ranked[0]?.url || item.url;
 }
 
-export async function sendAfterDownload(chatId: number) {
-  const clip = lastClip(chatId);
-  const { shareTargets } = await import("./product.server");
-  const url = clip?.url || `https://t.me/${BOT_USERNAME}`;
-  const s = shareTargets(url, clip?.title);
-  await swallowSideEffect(() =>
-    telegram.sendMessage(chatId, "تم التحميل ⚡️ شارك من أي منصة", {
-      reply_markup: inlineKeyboard([
-        [{ text: "مشاركة على تليجرام", url: s.telegram }],
-        [{ text: "سناب شات", url: s.snapchat }],
-        [
-          { text: "واتساب", url: s.whatsapp },
-          { text: "إكس", url: s.x },
-        ],
-        [{ text: "فيسبوك", url: s.facebook }],
-        [{ text: "لخّصه", callback_data: "ai:analyze" }, { text: "كابشن", callback_data: "ai:studio" }],
-        [
-          { text: "مكتبتي", url: "https://abdulrhman.ai/library" },
-          { text: "حسابي", url: "https://abdulrhman.ai/account" },
-        ],
-        [{ text: "تقييم", callback_data: "rt:ask" }],
-        [{ text: "ادعمنا بكوب قهوة", callback_data: "go:coffee" }],
-      ]),
-    }),
-  );
+export async function sendAfterDownload(_chatId: number) {
+  return;
 }
 
 export async function sendPlayCard(chatId: number, fromId: number, result: ExtractResult) {

@@ -39,27 +39,18 @@ export function canUseAi(member: Member | null | undefined, fromId?: number): bo
 }
 
 export async function sendPlanCatalog(chatId: number, fromId: number) {
-  const live = subscriptionsLive();
-  const owner = isOwnerId(fromId);
-  const rows = live || owner
-    ? [
-        [{ text: `${PLUS_PLAN.title} · ${PLUS_PLAN.stars}★`, callback_data: "go:sub:plus" }],
-        [{ text: `${PRO_PLAN.title} · ${PRO_PLAN.stars}★`, callback_data: "go:sub:pro" }],
-        [{ text: `${MAX_PLAN.title} · ${MAX_PLAN.stars}★`, callback_data: "go:sub:max" }],
-        [{ text: `${SEASON_PLAN.title} · وفّر 20%`, callback_data: "go:sub:season" }],
-      ]
-    : [];
-  const note = owner && !live ? "\n\nأنت المالك: الأزرار ترسل فاتورة تجريبية." : "";
-  await telegram.sendMessage(chatId, catalogText(live) + note, {
-    reply_markup: rows.length ? inlineKeyboard(rows) : undefined,
+  const rows = [
+    [{ text: `${PLUS_PLAN.title} · ${PLUS_PLAN.stars}★`, callback_data: "go:sub:plus" }],
+    [{ text: `${PRO_PLAN.title} · ${PRO_PLAN.stars}★`, callback_data: "go:sub:pro" }],
+    [{ text: `${MAX_PLAN.title} · ${MAX_PLAN.stars}★`, callback_data: "go:sub:max" }],
+    [{ text: `${SEASON_PLAN.title} · وفّر 20%`, callback_data: "go:sub:season" }],
+  ];
+  await telegram.sendMessage(chatId, catalogText(true), {
+    reply_markup: inlineKeyboard(rows),
   });
 }
 
 export async function sendPlanInvoice(chatId: number, fromId: number, planId: PlanId) {
-  if (!subscriptionsLive() && !isOwnerId(fromId)) {
-    await telegram.sendMessage(chatId, catalogText(false));
-    return;
-  }
   const plan = SUB_PLAN(planId);
   await telegram.sendInvoice(chatId, {
     title: plan.title,

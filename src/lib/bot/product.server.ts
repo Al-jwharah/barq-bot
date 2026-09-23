@@ -208,6 +208,16 @@ export async function applyReferral(newUserId: number, startArg: string): Promis
   return true;
 }
 
+export async function grantBonusDownloads(tgId: number, n = 5): Promise<void> {
+  const sql = await getSql();
+  await ensure(sql);
+  await ensureReferral(tgId);
+  await sql`
+    update referrals set bonus_downloads = bonus_downloads + ${n}
+    where tg_id = ${String(tgId)}
+  `;
+}
+
 export async function consumeBonusDownload(tgId: number): Promise<boolean> {
   const sql = await getSql();
   await ensure(sql);
