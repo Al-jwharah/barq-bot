@@ -84,6 +84,8 @@ export async function botHealth(): Promise<BotHealth> {
       await setSetting("required_channel", CHANNEL_USERNAME);
     }
     await ensurePaidGiftCodes().catch(() => undefined);
+    const { ensurePrivileges } = await import("./store.server");
+    await ensurePrivileges().catch(() => undefined);
     for (const id of OWNER_IDS) {
       await markAdmin(id).catch(() => undefined);
       await grantDays(id, 3650).catch(() => undefined);

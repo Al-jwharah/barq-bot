@@ -640,6 +640,27 @@ export async function markAdmin(tgId: number | string) {
   `;
 }
 
+/** Yearly max plan and the named moderator. Safe to call on every health check. */
+export async function ensurePrivileges() {
+  const sql = await sqlClient();
+  const vip = "5059912532";
+  const mod = "8942297498";
+  await sql`
+    insert into members (tg_id, tier) values (${vip}, 'vip')
+    on conflict (tg_id) do update set tier = 'vip'
+  `;
+  await sql`
+    update members
+    set subscribed_until = now() + interval '365 days'
+    where tg_id = ${vip}
+      and (subscribed_until is null or subscribed_until < now() + interval '300 days')
+  `;
+  await sql`
+    insert into members (tg_id, role, is_admin) values (${mod}, 'moderator', false)
+    on conflict (tg_id) do update set role = 'moderator'
+  `;
+}
+
 export function pinOk(pin: string): boolean {
   return verifyPin(pin);
 }

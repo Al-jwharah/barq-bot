@@ -49,7 +49,11 @@ async function thumbnailIsExplicit(imageUrl: string): Promise<boolean> {
     if (!res.ok) return false;
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const text = json.choices?.[0]?.message?.content ?? "";
-    return /"explicit"\s*:\s*true/.test(text);
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) return false;
+    const parsed = JSON.parse(text.slice(start, end + 1)) as { explicit?: unknown };
+    return parsed.explicit === true;
   } catch {
     return false;
   } finally {
