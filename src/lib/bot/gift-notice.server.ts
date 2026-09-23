@@ -19,7 +19,7 @@ export function moderatorNotice(): string {
 صرت مشرفًا في برق
 
 تراجع البلاغات وتوقف المحتوى المخالف.
-أرسل /start لتظهر أدوات المشرف.`;
+أرسل «ابدأ» لتظهر أدوات المشرف.`;
 }
 
 export async function notifyUser(tgId: number | string, text: string): Promise<void> {

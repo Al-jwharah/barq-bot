@@ -16,7 +16,7 @@ export function grokReady(): boolean {
   return Boolean(grokApiKey());
 }
 
-export const AI_USER_ERROR = "حدث خطأ مؤقت في Barq AI. حاول لاحقًا.";
+export const AI_USER_ERROR = "برق AI مشغول لحظة. الصق الرابط، أو أعد المحاولة بعد قليل.";
 export const AI_DAILY_LIMIT = BARQ_AI_DAILY;
 export const AI_INPUT_MAX = AI_MAX_MESSAGE_LENGTH;
 export const AI_TOKEN_MAX = AI_MAX_OUTPUT_TOKENS;
@@ -910,10 +910,10 @@ export async function askBarqAI(
   clip?: { url: string; title?: string; platform?: string },
 ): Promise<string> {
   if (!aiEnabled()) {
-    return "Barq AI متوقف مؤقتًا.";
+    return "برق AI متوقف مؤقتًا.";
   }
   if (!grokReady()) {
-    return "Barq AI يتهيأ. الصق رابط الفيديو الآن وأرجع بعد لحظات.";
+    return "برق AI يتهيأ. الصق رابط الفيديو الآن.";
   }
   const flightKey = String(userId);
   if (inFlight.has(flightKey)) {
@@ -982,10 +982,10 @@ export async function askBarqAI(
 
 export async function askOwnerGrok(text: string, fromId: number | string): Promise<string> {
   if (!aiEnabled()) {
-    return "Barq AI متوقف مؤقتًا.";
+    return "برق AI متوقف مؤقتًا.";
   }
   if (!grokReady()) {
-    return "Barq AI غير متاح الآن. أوامر الإدارة ما زالت تعمل من لوحة التحكم.";
+    return "برق AI غير متاح الآن. أوامر الإدارة ما زالت تعمل من لوحة التحكم.";
   }
   const flightKey = String(fromId);
   if (inFlight.has(flightKey)) {

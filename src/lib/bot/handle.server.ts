@@ -1771,7 +1771,7 @@ async function handleBarqChat(chatId: number, fromId: number, text: string) {
     if (!q.ok) {
       await telegram.sendMessage(
         chatId,
-        `خلصت رسائل Barq AI اليوم (${BARQ_AI_DAILY}). التحميل يبقى متاحًا — الصق الرابط.\nيرجع العدد بعد منتصف الليل بتوقيت الرياض.`,
+        `خلصت رسائل برق AI اليوم (${BARQ_AI_DAILY}). التحميل يبقى متاحًا — الصق الرابط.\nيرجع العدد بعد منتصف الليل بتوقيت الرياض.`,
         { reply_markup: await keysFor(fromId) },
       );
       return;
@@ -1792,7 +1792,7 @@ async function handleBarqChat(chatId: number, fromId: number, text: string) {
   } catch {
     await telegram.sendMessage(
       chatId,
-      `Barq AI مشغول لحظة. حاول لاحقًا.\nالصق الرابط للتحميل مباشرة.`,
+      `برق AI مشغول لحظة. الصق الرابط للتحميل مباشرة.`,
       { reply_markup: await keysFor(fromId) },
     );
   }
@@ -1812,7 +1812,7 @@ async function handleOwnerChat(chatId: number, text: string, fromId: number) {
     const message = err instanceof Error ? err.message : "تعذر الرد";
     await telegram.sendMessage(
       chatId,
-      `تعذر رد Barq AI: ${message}\nلوحة التحكم ما زالت تعمل.`,
+      `تعذر رد برق AI: ${message}\nلوحة التحكم ما زالت تعمل.`,
       { reply_markup: keys },
     );
   }
@@ -2458,6 +2458,15 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
 
   const urls = urlsFromMessage(msg);
   if (urls.length === 0) {
+    const mediaOnly =
+      !text &&
+      Boolean(msg.sticker || msg.animation || msg.photo || msg.video || msg.voice || msg.video_note || msg.audio);
+    if (mediaOnly && peekAwait(fromId) !== "hostfile") {
+      await telegram.sendMessage(chatId, "الصق رابط المقطع.", {
+        reply_markup: await keysFor(fromId, member),
+      });
+      return;
+    }
     if (peekAwait(fromId) === "hostfile" && (await hostIncomingIfAny(chatId, fromId, msg))) {
       clearAwait(fromId);
       return;
