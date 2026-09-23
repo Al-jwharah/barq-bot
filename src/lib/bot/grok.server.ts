@@ -896,11 +896,57 @@ async function ownerChatConfig(): Promise<{
   };
 }
 
-const BARQ_AI_SYSTEM = `أنت برق AI داخل بوت برق ⚡️. اسمك برق AI وليس جروك.
-- تخصصك: تحميل المقاطع، تلخيص آخر مقطع، كتابة كابشن، وشرح ما يسأل عنه المستخدم.
+const BARQ_AI_SYSTEM = `أنت برق AI، وكيل داخل بوت برق ⚡️ وليس مساعدًا ينتظر الأوامر فقط.
+- ابحث في الويب وتصفّح الصفحات العامة قبل ما تقول ما تعرف، إذا السؤال يحتاج معلومة حالية أو رابط.
+- تخصصك: التحميل، تلخيص آخر مقطع، كابشن، وشرح ما يسأل عنه المستخدم.
 - المحتوى الإباحي ممنوع. إذا طُلب لا تساعد في جلبه.
 - لا تختلق مشاهد لم ترها. التحميل يتم بلصق الرابط.
-- لا تكشف لوحة المالك ولا المفاتيح.`;
+- لا تكشف لوحة المالك ولا المفاتيح ولا تنفّذ أوامر الإدارة.`;
+
+const PUBLIC_AGENT_TOOLS = [
+  { type: "web_search" },
+  {
+    type: "function",
+    function: {
+      name: "browse_page",
+      description: "افتح رابط https عامًا واقرأ نص الصفحة",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string" } },
+        required: ["url"],
+      },
+    },
+  },
+];
+
+async function browsePublicPage(raw: string): Promise<string> {
+  try {
+    const { safeFetch } = await import("../media/ssrf");
+    const res = await safeFetch(raw, { timeoutMs: 8000 });
+    const html = await res.text();
+    const plain = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return plain.slice(0, 2500) || "الصفحة فاضية";
+  } catch {
+    return "ما قدرت أفتح الصفحة";
+  }
+}
+
+async function runPublicTool(name: string, argsRaw: string): Promise<string> {
+  if (name !== "browse_page") return "الأداة غير متاحة هنا";
+  let url = "";
+  try {
+    url = String(JSON.parse(argsRaw || "{}").url || "");
+  } catch {
+    url = "";
+  }
+  if (!/^https?:\/\//i.test(url)) return "الرابط غير صالح";
+  return browsePublicPage(url);
+}
 
 const publicHistory = new Map<number, ChatMessage[]>();
 
@@ -946,7 +992,7 @@ export async function askBarqAI(
         maxTokens: AI_MAX_OUTPUT_TOKENS,
         temperature: 0.55,
         model: "grok-4.5",
-        tools: wantsWebSearch(text) ? [{ type: "web_search" }] : undefined,
+        tools: PUBLIC_AGENT_TOOLS,
       });
       if (out.toolCalls.length) {
         messages.push({
@@ -955,11 +1001,12 @@ export async function askBarqAI(
           tool_calls: out.toolCalls,
         });
         for (const call of out.toolCalls) {
+          const result = await runPublicTool(call.function.name, call.function.arguments || "");
           messages.push({
             role: "tool",
             tool_call_id: call.id,
             name: call.function.name,
-            content: redactSecrets((call.function.arguments || "").slice(0, 4000) || "ok"),
+            content: redactSecrets(result).slice(0, 4000),
           });
         }
         continue;

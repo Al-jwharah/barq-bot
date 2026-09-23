@@ -21,6 +21,8 @@ export function mediaHeaders(extra?: HeadersInit, forUrl?: string): Headers {
         h.set("Referer", "https://www.facebook.com/");
       } else if (host.includes("cdninstagram") || host.includes("instagram")) {
         h.set("Referer", "https://www.instagram.com/");
+      } else if (host.includes("tikwm")) {
+        h.set("Referer", "https://www.tikwm.com/");
       } else if (host.includes("tiktok") || host.includes("muscdn") || host.includes("byteicdn")) {
         h.set("Referer", "https://www.tiktok.com/");
       } else if (host.includes("googlevideo") || host.includes("youtube") || host.includes("ytimg") || host.includes("ggpht")) {
@@ -78,7 +80,7 @@ export async function headSize(url: string): Promise<number | undefined> {
     const res = await safeFetch(url, {
       method: "HEAD",
       headers: mediaHeaders(undefined, url),
-      timeoutMs: 8000,
+      timeoutMs: 2500,
     });
     const len = res.headers.get("content-length");
     if (len) return Number(len);
@@ -90,8 +92,8 @@ export async function headSize(url: string): Promise<number | undefined> {
   try {
     const res = await safeFetch(url, {
       method: "GET",
-      headers: mediaHeaders({ Range: "bytes=0-0" }),
-      timeoutMs: 8000,
+      headers: mediaHeaders({ Range: "bytes=0-0" }, url),
+      timeoutMs: 2500,
     });
     const range = res.headers.get("content-range");
     const total = range?.split("/")[1];
@@ -118,7 +120,7 @@ export function isAllowedMediaHost(hostname: string): boolean {
 }
 
 const TELEGRAM_URL_SEND_SKIP =
-  /googlevideo\.com|youtube\.com|ytimg\.com|muscdn\.com|tiktokcdn|byteicdn|tiktokv\.com|tikcdn\.io|video\.twimg\.com|twimg\.com/i;
+  /googlevideo\.com|youtube\.com|ytimg\.com|muscdn\.com|tiktokcdn|byteicdn|tiktokv\.com|tikcdn\.io|tikwm\.com|video\.twimg\.com|twimg\.com/i;
 
 export function isTikcdnHost(url: string): boolean {
   try {

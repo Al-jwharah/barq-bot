@@ -22,7 +22,9 @@ test("owner has the full matrix, others are scoped", () => {
   assert.equal(can("moderator", "reports.review"), true);
   assert.equal(can("moderator", "content.ban"), true);
   assert.equal(can("moderator", "settings.write"), false);
-  assert.equal(can("moderator", "jobs.manage"), false);
+  assert.equal(can("moderator", "jobs.manage"), true);
+  assert.equal(can("moderator", "tickets.read"), true);
+  assert.equal(can("moderator", "errors.read"), true);
 
   assert.equal(can("support", "tickets.read"), true);
   assert.equal(can("support", "settings.write"), false);

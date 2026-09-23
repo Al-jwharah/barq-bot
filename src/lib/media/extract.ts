@@ -189,7 +189,9 @@ export async function extractMedia(input: string): Promise<ExtractResult> {
   try {
     return await tryOne(() => extractForPlatform(url, platform));
   } catch (err) {
-    errors.push(err instanceof Error ? err.message : "فشل");
+    const msg = err instanceof Error ? err.message : "فشل";
+    errors.push(msg);
+    if (/ما قدرت|تعذر |هذا مو |هذا رابط|غير مدعوم/.test(msg)) throw err instanceof Error ? err : new Error(msg);
   }
 
   if (platform !== "generic") {
@@ -218,21 +220,6 @@ export async function extractMedia(input: string): Promise<ExtractResult> {
     } catch (err) {
       errors.push(err instanceof Error ? err.message : "generic");
     }
-  }
-
-  try {
-    const { grokFindDirectMedia } = await import("../bot/grok.server");
-    const found = await grokFindDirectMedia(url);
-    if (found?.items.length) {
-      try {
-        return fitTelegramCloud(found);
-      } catch (err) {
-        if (isFileTooLarge(err)) return found;
-        throw err;
-      }
-    }
-  } catch {
-    /* grok is optional */
   }
 
   if (errors.some((e) => isFileTooLarge(e))) throw fileTooLargeError();

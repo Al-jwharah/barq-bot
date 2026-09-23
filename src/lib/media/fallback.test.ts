@@ -13,7 +13,7 @@ test("one message with two links is two downloads, capped later at five", () => 
 });
 
 test("YouTube rejects a non-youtube link before any download", async () => {
-  await assert.rejects(() => extractYouTube("https://example.com/not-a-video"), /\u064a\u0648\u062a\u064a\u0648\u0628/);
+  await assert.rejects(() => extractYouTube("https://example.com/not-a-video"), /يوتيوب/);
 });
 
 test("fallback sources are wired in the extractor and the worker", () => {

@@ -49,7 +49,13 @@ export async function keysFor(fromId: number, member?: Member | null) {
   if (role === "owner" && inGrokMode(fromId)) return GROK_KEYBOARD;
   if (role === "owner") return OWNER_KEYBOARD;
   if (role === "admin") return replyKeyboard([["لوحة التحكم", "/jobs"], ["/tickets", "كيف يعمل"]]);
-  if (role === "moderator") return replyKeyboard([["/reports", "/block"], ["كيف يعمل"]]);
+  if (role === "moderator") {
+    return replyKeyboard([
+      ["البلاغات", "تذاكر الدعم"],
+      ["المهام", "مراقبة"],
+      ["كيف يعمل"],
+    ]);
+  }
   if (role === "support") return replyKeyboard([["/tickets", "كيف يعمل"]]);
   return FREE_KEYBOARD;
 }

@@ -169,6 +169,10 @@ export function buildYtDlpArgs(opts: {
     Number.isFinite(end) && end > 0
       ? (["--yes-playlist", "--flat-playlist", "--playlist-end", String(Math.min(Math.trunc(end), 5))] as const)
       : (["--no-playlist"] as const);
+  const js =
+    /(?:^|\.)youtube\.com$|youtu\.be/i.test(safeHost(url))
+      ? (["--js-runtimes", "node"] as const)
+      : [];
   return [
     ...head,
     ...playlist,
@@ -176,12 +180,21 @@ export function buildYtDlpArgs(opts: {
     "--max-filesize",
     maxFilesizeFlag(),
     "--no-warnings",
+    ...js,
     "-o",
     opts.outputPath,
     ...extra,
     "--",
     url,
   ];
+}
+
+function safeHost(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
 
 function downloadTimeoutMs(fallback: number): number {

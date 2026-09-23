@@ -193,6 +193,7 @@ export async function archiveDelivered(input: {
   try {
     if (vaultArchiveOff()) return;
     const dest = (await vaultChatId()) || (await probeAndBindVault()) || CHANNEL_CHAT;
+    if (String(dest) === String(input.fromChatId)) return false;
     const caption = archiveCaption({ who: input.who, sourceUrl: input.sourceUrl });
     let ok = false;
     let lastErr = "";

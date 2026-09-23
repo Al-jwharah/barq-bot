@@ -271,10 +271,23 @@ export async function analyticsReport(): Promise<string> {
     select coalesce(avg(stars), 0)::float as avg, count(*)::int as c from download_ratings
     where created_at > now() - interval '7 days'
   `.catch(() => [{ avg: 0, c: 0 }]);
+  const jobs = await sql<{ ok: number; bad: number }>`
+    select
+      count(*) filter (where ok = true)::int as ok,
+      count(*) filter (where ok = false)::int as bad
+    from download_logs
+    where created_at > now() - interval '1 day'
+  `.catch(() => [{ ok: 0, bad: 0 }]);
+  const dau = await sql<{ c: number }>`
+    select count(*)::int as c from user_stats where last_seen_day = current_date
+  `.catch(() => [{ c: 0 }]);
   const plat = platforms.map((p) => `• ${p.platform}: ${p.c}`).join("\n") || "لا بيانات بعد";
   const peak = hours.map((h) => `${h.h}:00 (${h.c})`).join(" · ") || "—";
   return [
     "تحليلات 7 أيام ⚡️",
+    "",
+    `النشطون اليوم: ${dau[0]?.c ?? 0}`,
+    `نجاح/فشل اليوم: ${jobs[0]?.ok ?? 0} / ${jobs[0]?.bad ?? 0}`,
     "",
     "المنصات:",
     plat,

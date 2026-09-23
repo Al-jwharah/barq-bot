@@ -30,6 +30,8 @@ function forceTikTokFile(result: ExtractResult): ExtractResult {
   const video = result.items.find((item) => item.kind === "video" || item.kind === "gif");
   if (!video) return result;
   const hd = `https://www.tikwm.com/video/media/hdplay/${id}.mp4`;
+  const play = `https://www.tikwm.com/video/media/play/${id}.mp4`;
+  const cdn = `https://tikcdn.io/ssstik/${id}`;
   return {
     ...result,
     items: [
@@ -37,7 +39,11 @@ function forceTikTokFile(result: ExtractResult): ExtractResult {
         ...video,
         kind: "video",
         url: hd,
-        variants: [{ url: hd, quality: "HD", contentType: "video/mp4" }],
+        variants: [
+          { url: hd, quality: "HD", contentType: "video/mp4" },
+          { url: play, quality: "أصل", contentType: "video/mp4" },
+          { url: cdn, quality: "بديل", contentType: "video/mp4" },
+        ],
       },
     ],
   };
@@ -45,6 +51,18 @@ function forceTikTokFile(result: ExtractResult): ExtractResult {
 
 const REQUEST_CONTEXT = Symbol.for("@vercel/request-context");
 
+/**
+ * Executor honesty:
+ * Vercel serverless + `waitUntil` is the current executor (`/api/jobs`, `/api/keep`,
+ * webhook kick via `@vercel/functions`). A dedicated always-on worker process is
+ * NOT deployed. Public launch is blocked until that worker exists.
+ * `MAX_CONCURRENT_JOBS` env is honored when set; otherwise concurrency is 3.
+ * This module runs inside the serverless request — it is not a separate process.
+ *
+ * `@vercel/functions` waitUntil is a silent no-op when
+ * `Symbol.for("@vercel/request-context")` is missing (Nitro/TanStack Start).
+ * Callers MUST await the returned promise unless attachWaitUntil() is true.
+ */
 export function attachWaitUntil(task: Promise<unknown>): boolean {
   try {
     const ctx = (
@@ -69,6 +87,7 @@ async function editStatus(chatId: number, messageId: number | null, text: string
   await telegram.editMessageText(chatId, messageId, text).catch(() => undefined);
 }
 
+/** Outer bound: DOWNLOAD_TIMEOUT_MS (default 900000). Kills yt-dlp/ffmpeg via proc-registry. */
 async function withDeadline<T>(jobId: string, ms: number, fn: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let settled = false;
@@ -166,9 +185,9 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   }
   const { archiveDelivered } = await import("../bot/vault.server");
   const media = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
-  const { getMember } = await import("../bot/store.server");
-  const person = await getMember(fromId).catch(() => null);
-  await archiveDelivered({
+    const { getMember } = await import("../bot/store.server");
+    const person = await getMember(fromId).catch(() => null);
+    await archiveDelivered({
     fromChatId: chatId,
     messageIds: ids,
     sourceUrl: job.url,
@@ -197,6 +216,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
 export async function processDownloadJob(id?: string): Promise<{ id?: string; status: string }> {
   const rid = requestId();
   const started = Date.now();
+  // claimNextJob uses FOR UPDATE SKIP LOCKED on postgres and stamps worker_id / last_heartbeat_at.
   const job = await claimNextJob(id);
   if (!job) return { status: "empty" };
   const chatId = Number(job.chat_id);
@@ -308,6 +328,7 @@ export async function processDownloadJob(id?: string): Promise<{ id?: string; st
 
 import { workersForLoad } from "../bot/queue-priority";
 
+/** Drain cap: `MAX_CONCURRENT_JOBS` when set and positive, else 3. Scales with queue depth. */
 export function maxConcurrentJobs(): number {
   const raw = process.env.MAX_CONCURRENT_JOBS;
   if (raw == null || String(raw).trim() === "") return 3;

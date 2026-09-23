@@ -559,9 +559,12 @@ export async function deliver(chatId: number, result: ExtractResult, stamp = fal
     const hosted = await sendHostedMedia(chatId, fromId ?? chatId, result);
     return hosted ? [hosted] : [];
   }
-  const preferred = result.items.some((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio")
-    ? result.items.filter((i) => i.kind !== "photo")
-    : result.items;
+  const videos = result.items.filter((i) => i.kind === "video" || i.kind === "gif");
+  const preferred = videos.length
+    ? videos.slice(0, 1)
+    : result.items.some((i) => i.kind === "audio")
+      ? result.items.filter((i) => i.kind === "audio").slice(0, 1)
+      : result.items.slice(0, 1);
   if (preferred.length === 0) {
     throw new Error("المنشور ما فيه فيديو أو صورة");
   }
@@ -1935,7 +1938,18 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   const downloadUrls = urlsFromMessage(msg);
   if (downloadUrls[0]) {
     clearAwait(fromId);
-    await handleDownload(chatId, fromId, downloadUrls[0], member, updateId);
+    const batch = [...new Set(downloadUrls)].slice(0, 5);
+    if (batch.length > 1) {
+      await telegram.sendMessage(
+        chatId,
+        downloadUrls.length > 5
+          ? `وصلت ${downloadUrls.length} روابط. أجهّز أول 5، كل واحد لحاله.`
+          : `وصلت ${batch.length} روابط. أجهّزها واحد واحد.`,
+      );
+    }
+    for (let i = 0; i < batch.length; i += 1) {
+      await handleDownload(chatId, fromId, batch[i]!, member, i === 0 ? updateId : undefined);
+    }
     return;
   }
 
@@ -2054,6 +2068,22 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     clearAwait(fromId);
     const handled = await handleOwnerAwait(chatId, fromId, pending, text);
     if (handled) return;
+  }
+
+  if (text === "البلاغات" || text === "تذاكر الدعم" || text === "المهام" || text === "مراقبة" || text === "المراقبة") {
+    if (text === "مراقبة" || text === "المراقبة") {
+      const { actorRole } = await import("./acl.server");
+      const { can } = await import("./roles.server");
+      const role = owner ? "owner" : await actorRole(fromId);
+      if (owner || can(role, "errors.read")) {
+        await sendWatch(chatId, fromId);
+        return;
+      }
+    } else {
+      const mapped = text === "البلاغات" ? "/reports" : text === "تذاكر الدعم" ? "/tickets" : "/jobs";
+      await handleAdminCommand(chatId, mapped, fromId);
+      return;
+    }
   }
 
   if (text.startsWith("/")) {
@@ -2244,9 +2274,11 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       await hostIncomingIfAny(chatId, fromId, msg);
       return;
     }
-    const grokUrls = urlsFromMessage(msg);
+    const grokUrls = [...new Set(urlsFromMessage(msg))].slice(0, 5);
     if (grokUrls[0]) {
-      await handleDownload(chatId, fromId, grokUrls[0], member, updateId);
+      for (let i = 0; i < grokUrls.length; i += 1) {
+        await handleDownload(chatId, fromId, grokUrls[i]!, member, i === 0 ? updateId : undefined);
+      }
       return;
     }
     await handleOwnerChat(chatId, text || "(رسالة بلا نص)", fromId);
@@ -2456,7 +2488,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
 
-  const urls = urlsFromMessage(msg);
+  const urls = [...new Set(urlsFromMessage(msg))].slice(0, 5);
   if (urls.length === 0) {
     const mediaOnly =
       !text &&
@@ -2479,7 +2511,9 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
 
-  await handleDownload(chatId, fromId, urls[0]!, member, updateId);
+  for (let i = 0; i < urls.length; i += 1) {
+    await handleDownload(chatId, fromId, urls[i]!, member, i === 0 ? updateId : undefined);
+  }
 }
 
 function chatIdFromUpdate(update: TgUpdate): number | null {

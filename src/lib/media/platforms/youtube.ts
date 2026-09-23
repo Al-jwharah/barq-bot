@@ -1,5 +1,4 @@
 import { fetchJson } from "../http";
-import { extractWithYtdlp } from "../ytdlp";
 import type { ExtractResult, MediaItem, MediaVariant } from "../types";
 import { qualityLabel, youtubeIdFromUrl } from "../urls";
 
@@ -86,7 +85,7 @@ async function innertube(videoId: string, client: (typeof CLIENTS)[number]) {
       contentCheckOk: true,
       racyCheckOk: true,
     }),
-  });
+  }, 6000);
 }
 
 function muxedVariants(player: YtPlayer): MediaVariant[] {
@@ -305,32 +304,48 @@ export async function extractYouTube(url: string): Promise<ExtractResult> {
   const id = youtubeIdFromUrl(url);
   if (!id) throw new Error("هذا مو رابط يوتيوب واضح");
   const watch = `https://www.youtube.com/watch?v=${id}`;
-
-  for (const client of CLIENTS) {
-    try {
-      const player = await innertube(id, client);
-      if (player.playabilityStatus?.status === "LOGIN_REQUIRED") continue;
-      const variants = muxedVariants(player);
-      if (variants.length) return fromPlayer(id, player, variants);
-    } catch {
-      /* next client */
-    }
-  }
-
+  const fast = CLIENTS.slice(0, 3).map(async (client) => {
+    const player = await innertube(id, client);
+    if (player.playabilityStatus?.status === "LOGIN_REQUIRED") return null;
+    const variants = muxedVariants(player);
+    return variants.length ? fromPlayer(id, player, variants) : null;
+  });
+  const raced = await firstReady([
+    ...fast,
+    extractCobalt(watch, id),
+  ]);
+  if (raced) return raced;
   const piped = await extractPiped(id);
   if (piped) return piped;
+  const inv = await extractInvidious(id);
+  if (inv) return inv;
+  // Last path: yt-dlp with the Node runtime. Used when the Android client and
+  // the public Piped/Invidious/Cobalt mirrors are blocked or empty.
+  const { extractWithYtdlp } = await import("../ytdlp");
+  return extractWithYtdlp(watch, "youtube");
+}
 
-  const invidious = await extractInvidious(id);
-  if (invidious) return invidious;
-
-  const cobalt = await extractCobalt(watch, id);
-  if (cobalt) return cobalt;
-
-  try {
-    return await extractWithYtdlp(watch, "youtube");
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "";
-    if (msg.includes("تحقق") || msg.includes("تليجرام")) throw err;
-    throw new Error("ما قدرت أجيب ملف يوتيوب. افتح الرابط من الموقع للتحميل المباشر.");
-  }
+async function firstReady(jobs: Array<Promise<ExtractResult | null>>): Promise<ExtractResult | null> {
+  return new Promise((resolve) => {
+    let left = jobs.length;
+    if (!left) {
+      resolve(null);
+      return;
+    }
+    for (const job of jobs) {
+      job
+        .then((value) => {
+          if (value) {
+            resolve(value);
+            return;
+          }
+          left -= 1;
+          if (left === 0) resolve(null);
+        })
+        .catch(() => {
+          left -= 1;
+          if (left === 0) resolve(null);
+        });
+    }
+  });
 }
