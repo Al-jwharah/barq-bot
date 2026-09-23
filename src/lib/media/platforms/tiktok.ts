@@ -13,6 +13,7 @@ type Tikwm = {
     play?: string;
     hdplay?: string;
     wmplay?: string;
+    images?: string[];
     duration?: number;
     author?: { nickname?: string; unique_id?: string };
     music?: string;
@@ -113,9 +114,15 @@ async function fromTikwm(url: string): Promise<ExtractResult | null> {
       if (variants.some((v) => v.url === u)) return;
       variants.push(variant(u, quality ?? "أصل"));
     };
-    addVideo(d.hdplay, "HD");
-    addVideo(d.play, "بدون علامة");
-    addVideo(d.wmplay, "بعلامة");
+    if (d.id && /^\d{8,30}$/.test(d.id)) {
+      addVideo(`https://www.tikwm.com/video/media/hdplay/${d.id}.mp4`, "HD");
+      addVideo(`https://www.tikwm.com/video/media/play/${d.id}.mp4`, "بدون علامة");
+    }
+    if (!variants.length) {
+      addVideo(d.hdplay, "HD");
+      addVideo(d.play, "بدون علامة");
+      addVideo(d.wmplay, "بعلامة");
+    }
     if (variants.length) {
       items.push({
         kind: "video",
