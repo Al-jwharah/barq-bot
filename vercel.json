@@ -7,10 +7,6 @@
     {
       "path": "/api/keep",
       "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/remind",
-      "schedule": "0 * * * *"
     }
   ]
 }

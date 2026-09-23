@@ -74,6 +74,8 @@ async function tick() {
       await pollLiveFollows().catch(() => undefined);
       await runDailyBackup().catch(() => undefined);
       await cleanupFileCache().catch(() => undefined);
+      const { maybeHourlyReminder } = await import("@/lib/bot/remind.server");
+      await maybeHourlyReminder().catch(() => undefined);
       await flushDb().catch(() => undefined);
     })(),
   );
