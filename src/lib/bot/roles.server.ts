@@ -45,7 +45,7 @@ const ALL_PERMISSIONS: Permission[] = [
 const MATRIX: Record<Role, ReadonlySet<Permission>> = {
   owner: new Set(ALL_PERMISSIONS),
   admin: new Set(["users.read", "jobs.manage", "jobs.retry", "errors.read"]),
-  moderator: new Set(["reports.review", "content.ban"]),
+  moderator: new Set(["reports.review", "content.ban", "tickets.read", "jobs.manage", "errors.read", "users.read"]),
   support: new Set(["tickets.read"]),
   user: new Set(),
 };

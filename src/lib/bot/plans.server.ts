@@ -28,7 +28,8 @@ export function canUseYoutube(member: Member | null | undefined, fromId?: number
   if (!subscriptionsLive()) return true;
   if (fromId != null && isOwnerId(fromId)) return true;
   if (member && isOwnerId(member.tg_id)) return true;
-  return Boolean(memberPlan(member)?.youtube);
+  if (member && isSubscribed(member)) return true;
+  return false;
 }
 
 export function canUseAi(member: Member | null | undefined, fromId?: number): boolean {
