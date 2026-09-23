@@ -14,15 +14,15 @@ export default async function canonicalOriginMiddleware(
   const origin = getPublicOrigin();
 
   if ((method === "GET" || method === "HEAD") && path === "/robots.txt") {
-    const sitemap = origin ? `Sitemap: ${publicUrl("/sitemap.xml")}\n` : "";
-    return new Response(`User-agent: *\nAllow: /\n${sitemap}`, {
+    return new Response("User-agent: *\nAllow: /\nSitemap: https://abdulrhman.ai/sitemap.xml\n", {
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
 
   if ((method === "GET" || method === "HEAD") && path === "/sitemap.xml") {
     if (!origin) return new Response("BARQ_PUBLIC_ORIGIN missing", { status: 503 });
-    const urls = ["/", "/admin"].map((p) => publicUrl(p));
+    const pages = ["/", "/tiktok", "/instagram", "/youtube", "/x", "/facebook", "/snapchat", "/faq", "/legal"];
+    const urls = pages.map((p) => `https://abdulrhman.ai${p === "/" ? "" : p}`);
     const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map((loc) => `  <url><loc>${loc}</loc></url>`).join("\n")}
