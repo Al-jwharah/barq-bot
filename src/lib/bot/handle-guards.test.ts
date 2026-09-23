@@ -38,6 +38,8 @@ test("hostfile mode yields to http links and slash commands", () => {
   assert.equal(hostfileYieldsToDownload("x.com/a/status/1"), true);
   assert.equal(hostfileYieldsToDownload("/start"), true);
   assert.equal(hostfileYieldsToDownload("سجلي"), true);
+  assert.equal(hostfileYieldsToDownload("رفع ملف"), true);
+  assert.equal(hostfileYieldsToDownload("لخّصه"), true);
   assert.equal(hostfileYieldsToDownload("مرحبا"), false);
   assert.equal(decideHostfile({ text: "https://x.com/a", hasUrl: true, hasFile: false }), "download");
   assert.equal(decideHostfile({ text: "ok", hasUrl: false, hasFile: true }), "upload");

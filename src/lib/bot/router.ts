@@ -15,7 +15,7 @@ export type Intent =
   | "other";
 
 const START = new Set(["/start", "القائمة", "بدء"]);
-const AI = new Set(["barq ai", "/ai", "جروك", "/grok"]);
+const AI = new Set(["barq ai", "/ai", "جروك", "/grok", "لخّصه", "لخصه", "كابشن", "تلخيص", "تحليل الفيديو", "تجهيز للنشر"]);
 const LIVE = new Set(["/live", "البث", "live recorder"]);
 const ACCOUNT = new Set(["حسابي", "/account", "سجلي", "/history", "سجل التحميل"]);
 const POINTS = new Set(["نقاطي", "/points"]);

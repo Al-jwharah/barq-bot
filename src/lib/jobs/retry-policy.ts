@@ -53,7 +53,9 @@ export function userFailMessage(raw: string): string {
   }
   if (/blocked|nsfw|adult/.test(s)) return "تعذر تحميل هذا المحتوى.";
   if (/timeout|timed out|etimedout|download_timeout|aborted/.test(s)) return "انتهت مهلة المصدر. حاول لاحقًا.";
-  if (/download_failed_spawn|spawn/.test(s)) return "تعذر إرسال الملف. أعد إرسال الرابط.";
+  if (/enoent|ffmpeg|libmp3lame|spawn/.test(s)) {
+    return "تحويل الصوت غير متاح على السيرفر. أعد إرسال الرابط ويصلك المقطع كامل.";
+  }
   if (/(?:^|\s)429\b|rate limit/.test(s) && !/redirect/.test(s)) {
     return "تعذر التحميل من المصدر. أعد إرسال الرابط.";
   }

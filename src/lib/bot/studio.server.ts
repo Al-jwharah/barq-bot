@@ -9,7 +9,8 @@ const SYSTEM = `أنت استوديو صانع محتوى لبرق. من الم�
 نبرة عربية خليجية خفيفة. لا تختلق مشاهد غير موجودة في العنوان.`;
 
 export async function creatorStudio(userId: number): Promise<string> {
-  const clip = lastClip(userId);
+  const { recallClip } = await import("./library.server");
+  const clip = (await recallClip(userId).catch(() => undefined)) ?? lastClip(userId);
   if (!clip?.url) return "حمّل المقطع أولاً ثم اضغط تجهيز للنشر.";
   if (!grokReady()) return "Barq AI يتهيأ. جرّب الاستوديو بعد لحظات.";
   const { grokApiKey, AI_TIMEOUT_MS } = await import("./config.server");

@@ -15,7 +15,8 @@ type Tikwm = {
     wmplay?: string;
     duration?: number;
     author?: { nickname?: string; unique_id?: string };
-    images?: string[];
+    music?: string;
+    music_info?: { play?: string };
   };
 };
 
@@ -123,6 +124,16 @@ async function fromTikwm(url: string): Promise<ExtractResult | null> {
         duration: d.duration,
         variants,
       });
+      const music = d.music_info?.play || d.music;
+      if (music && music.startsWith("http")) {
+        items.push({
+          kind: "audio",
+          url: music,
+          thumbnail: d.cover,
+          duration: d.duration,
+          variants: [{ url: music, quality: "صوت", contentType: "audio/mpeg" }],
+        });
+      }
     } else if (d.images && d.images.length > 0) {
       for (const img of d.images) {
         items.push({

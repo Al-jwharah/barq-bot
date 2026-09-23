@@ -62,7 +62,12 @@ export function clipCaption(
     seed != null && Number.isFinite(seed)
       ? ((Math.trunc(seed) % n) + n) % n
       : Math.floor(Math.random() * n);
-  return `${FUN_SIGNATURES[i]}\n\n@${handle}`;
+  return `${FUN_SIGNATURES[i]}
+
+الموقع
+https://abdulrhman.ai
+
+@${handle}`;
 }
 
 export const TRY_BOT_LABEL = "جرب البوت الآن ⚡️";

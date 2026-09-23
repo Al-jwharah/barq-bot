@@ -48,12 +48,21 @@ test("Barq AI => ai", () => {
   assert.equal(classifyIntent({ text: "Barq AI", urls: [], hasFile: false }), "ai");
 });
 
+test("لخّصه / كابشن => ai", () => {
+  assert.equal(classifyIntent({ text: "لخّصه", urls: [], hasFile: false }), "ai");
+  assert.equal(classifyIntent({ text: "كابشن", urls: [], hasFile: false }), "ai");
+});
+
 test("/live @x => live", () => {
   assert.equal(classifyIntent({ text: "/live @x", urls: [], hasFile: false }), "live");
 });
 
 test("رابط مؤقت => short", () => {
   assert.equal(classifyIntent({ text: "رابط مؤقت", urls: [], hasFile: false }), "short");
+});
+
+test("رفع ملف is not a download", () => {
+  assert.equal(classifyIntent({ text: "رفع ملف", urls: [], hasFile: false }), "other");
 });
 
 test("hello => other", () => {

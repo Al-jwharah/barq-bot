@@ -10,7 +10,8 @@ const SYSTEM = `أنت محرر محتوى لبرق. من رابط/عنوان ا
 لا تختلق مشاهد. إن نقص السياق قل ذلك.`;
 
 export async function analyzeClip(userId: number): Promise<string> {
-  const clip = lastClip(userId);
+  const { recallClip } = await import("./library.server");
+  const clip = (await recallClip(userId).catch(() => undefined)) ?? lastClip(userId);
   if (!clip?.url) {
     return "ما عندي المقطع. حمّله أولاً ثم اضغط تحليل الفيديو.";
   }

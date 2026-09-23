@@ -25,16 +25,19 @@ export const OWNER_ONLY_LABELS = new Set([
 ]);
 
 export const SUB_KEYBOARD = replyKeyboard([
-  ["رابط مؤقت", "حالة الاشتراك"],
-  ["كيف يعمل", SUPPORT_BTN],
+  ["رابط مؤقت", "رفع ملف"],
+  ["لخّصه", "كابشن"],
+  ["حالة الاشتراك", SUPPORT_BTN],
 ]);
 
 export const FREE_KEYBOARD = replyKeyboard([
-  ["رابط مؤقت", "سجلي"],
-  ["حدّي", "Barq AI"],
-  ["رحلتي", "إنجازاتي"],
-  ["أعجبني", "حسابي"],
-  ["نقاطي", "كيف يعمل"],
+  ["رابط مؤقت", "رفع ملف"],
+  ["لخّصه", "كابشن"],
+  ["سجلي", "حدّي"],
+  ["Barq AI", "رحلتي"],
+  ["إنجازاتي", "أعجبني"],
+  ["حسابي", "نقاطي"],
+  ["كيف يعمل"],
 ]);
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";

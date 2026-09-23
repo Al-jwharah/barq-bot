@@ -224,9 +224,12 @@ ${SUB_SAR} ريال شهريًا بنجوم تليجرام — تحميل بلا
 function startCaption(free: number, channel: string, role: UserRole): string {
   if (role === "owner") {
     return `${BOT_DISPLAY_NAME}
-لوحة المالك جاهزة — كل الأزرار تحت.
+لوحة المالك جاهزة.
 
-أرسل رابطًا للتحميل، أو اكتب لـ Barq AI، أو افتح لوحة التحكم.`;
+الصق رابطًا، أو افتح الموقع:
+https://abdulrhman.ai
+
+لخّصه وكابشن ورابط مؤقت تحت.`;
   }
   if (role === "sub") {
     return `${BOT_DISPLAY_NAME}
@@ -615,11 +618,25 @@ export async function fulfillQualityPick(chatId: number, fromId: number, pickId:
   await telegram.sendChatAction(chatId, choice === "mp3" ? "upload_voice" : "upload_video");
   const { blobToMp3, blobToMp4, needsMp4Remux } = await import("../media/convert.server");
   if (choice === "mp3") {
-    let blob = await downloadBlob(variant.url);
-    blob = await blobToMp3(blob);
-    const cap = signatureCaption("audio", result.platform, result.sourceUrl);
-    const name = blob.type.includes("mpeg") ? `barq-${result.id ?? "a"}.mp3` : `barq-${result.id ?? "a"}.m4a`;
-    await sendAudioFile(chatId, blob, name, cap ? { caption: cap } : {});
+    try {
+      const audio = result.items.find((i) => i.kind === "audio");
+      if (audio?.url) {
+        await telegram.sendAudioUrl(chatId, audio.url, { caption: "صوت المقطع" });
+      } else {
+        let blob = await downloadBlob(variant.url);
+        blob = await blobToMp3(blob);
+        const cap = signatureCaption("audio", result.platform, result.sourceUrl);
+        const name = blob.type.includes("mpeg") ? `barq-${result.id ?? "a"}.mp3` : `barq-${result.id ?? "a"}.m4a`;
+        await sendAudioFile(chatId, blob, name, cap ? { caption: cap } : {});
+      }
+    } catch {
+      await telegram.sendMessage(
+        chatId,
+        "تحويل الصوت غير متاح على السيرفر. أرسلت المقطع كامل بالصوت.",
+      );
+      const picked: MediaItem = { ...item, url: variant.url, variants: [variant], kind: item.kind === "gif" ? "gif" : "video" };
+      await sendVideoItem(chatId, { ...result, items: [picked] }, picked, true, payload.stamp);
+    }
   } else if (choice === "file" || choice === "snap") {
     let blob = await downloadBlob(variant.url);
     if (needsMp4Remux(variant.contentType, variant.url)) {
@@ -1306,12 +1323,16 @@ async function handleCallback(cb: TgCallbackQuery) {
   }
   if (data === "go:short") {
     await telegram.answerCallback(cb.id);
+    await sendShortLink(targetChat, fromId);
+    return;
+  }
+  if (data === "go:host") {
+    await telegram.answerCallback(cb.id);
     setAwait(fromId, "hostfile");
     await telegram.sendMessage(
       targetChat,
-      "أرسل الآن الصورة أو الفيديو أو المجلد المضغوط أو تطبيق آبل.\nرابط مباشر لمدة 24 ساعة.",
+      "أرسل الملف الآن (صورة أو فيديو أو مضغوط أو تطبيق).\nرابط مباشر 24 ساعة · حد 20 ميغا.",
     );
-    await sendShortLink(targetChat, fromId);
     return;
   }
   if (data.startsWith("cd:")) {
@@ -1445,8 +1466,11 @@ export async function sendAfterDownload(chatId: number) {
           { text: "إكس", url: s.x },
         ],
         [{ text: "فيسبوك", url: s.facebook }],
-        [{ text: "تحليل الفيديو 🤖", callback_data: "ai:analyze" }],
-        [{ text: "تجهيز للنشر", callback_data: "ai:studio" }],
+        [{ text: "لخّصه", callback_data: "ai:analyze" }, { text: "كابشن", callback_data: "ai:studio" }],
+        [
+          { text: "مكتبتي", url: "https://abdulrhman.ai/library" },
+          { text: "حسابي", url: "https://abdulrhman.ai/account" },
+        ],
         [{ text: "تقييم", callback_data: "rt:ask" }],
         [{ text: "ادعمنا بكوب قهوة", callback_data: "go:coffee" }],
       ]),
@@ -1466,6 +1490,15 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
     thumbnail: item.thumbnail,
     kind: item.kind,
   });
+  const { rememberClip } = await import("./library.server");
+  await rememberClip(fromId, {
+    url: result.sourceUrl,
+    title: result.title ?? result.text,
+    platform: result.platform,
+    mediaUrl,
+    thumbnail: item.thumbnail,
+    kind: item.kind,
+  }).catch(() => undefined);
 }
 
 async function sendSourceLine(chatId: number, result: ExtractResult) {
@@ -1482,10 +1515,10 @@ async function hostIncomingIfAny(chatId: number, fromId: number, msg: TgMessage)
 
 async function sendShortLink(chatId: number, fromId: number) {
   const clip = lastClip(fromId);
-  if (!clip?.url || !clip.mediaUrl) {
+  if (!clip?.mediaUrl) {
     await telegram.sendMessage(
       chatId,
-      "أرسل رابطًا أو فيديو أو صورة أو ملفًا، ثم اضغط «رابط مؤقت».",
+      "حمّل المقطع أولاً (الصق الرابط). بعد ما يوصلك الملف اضغط «رابط مؤقت».",
       { reply_markup: await keysFor(fromId) },
     );
     return;
@@ -1504,9 +1537,9 @@ async function sendShortLink(chatId: number, fromId: number) {
     const src = clip.platform ? `المصدر: ${platformLabelAr(clip.platform)}\n` : "";
     await telegram.sendMessage(
       chatId,
-      `${src}رابط مباشر 24 ساعة\n${short}`,
+      `${src}رابط مؤقت 24 ساعة — يفتح التحميل مباشرة\n${short}`,
       {
-        reply_markup: inlineKeyboard([[{ text: "فتح الرابط", url: short }]]),
+        reply_markup: inlineKeyboard([[{ text: "تحميل المقطع", url: short }]]),
       },
     );
   } catch {
@@ -2062,6 +2095,16 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       return;
     }
   }
+  if (text === "لخّصه" || text === "لخصه" || text === "تلخيص" || text === "تحليل الفيديو") {
+    await telegram.sendChatAction(chatId, "typing");
+    await handleAnalyze(chatId, fromId, member);
+    return;
+  }
+  if (text === "كابشن" || text === "تجهيز للنشر") {
+    await telegram.sendChatAction(chatId, "typing");
+    await handleStudio(chatId, fromId, member);
+    return;
+  }
   if (text === "جروك" || text === "Barq AI" || text.startsWith("/grok")) {
     if (owner) {
       await enterGrokMode(chatId, fromId);
@@ -2306,14 +2349,16 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
   if (text === "رابط مؤقت" || text === "رابط مختصر 24س" || text === "اشغله" || text.startsWith("/short")) {
+    await sendShortLink(chatId, fromId);
+    return;
+  }
+  if (text === "رفع ملف" || text.startsWith("/host")) {
     setAwait(fromId, "hostfile");
     await telegram.sendMessage(
       chatId,
-      "أرسل الآن الصورة أو الفيديو أو المجلد المضغوط أو تطبيق آبل.\nأصدر لك رابط مباشر لمدة 24 ساعة (حد 20 ميغابايت).",
+      "أرسل الملف الآن (صورة أو فيديو أو مضغوط أو تطبيق).\nرابط مباشر 24 ساعة · حد 20 ميغا.",
       { reply_markup: await keysFor(fromId, member) },
     );
-    const clip = lastClip(fromId);
-    if (clip?.mediaUrl) await sendShortLink(chatId, fromId);
     return;
   }
   if (text === AD_BTN || text.startsWith("/ad")) {
@@ -2348,7 +2393,10 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
 
   const urls = urlsFromMessage(msg);
   if (urls.length === 0) {
-    if (await hostIncomingIfAny(chatId, fromId, msg)) return;
+    if (peekAwait(fromId) === "hostfile" && (await hostIncomingIfAny(chatId, fromId, msg))) {
+      clearAwait(fromId);
+      return;
+    }
     if (owner) {
       await handleOwnerChat(chatId, text || "(رسالة بلا نص)", fromId);
       return;

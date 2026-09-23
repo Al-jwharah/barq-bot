@@ -49,6 +49,10 @@ const HOSTFILE_EXIT = new Set([
   "دعوة",
   "كوبون",
   "رابط مؤقت",
+  "رفع ملف",
+  "لخّصه",
+  "لخصه",
+  "كابشن",
 ]);
 
 export function hostfileYieldsToDownload(text: string): boolean {

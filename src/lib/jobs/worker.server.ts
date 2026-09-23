@@ -98,12 +98,11 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   const chatId = Number(job.chat_id);
   const fromId = Number(job.tg_id);
   const mid = job.status_message_id;
-  await editStatus(chatId, mid, "🔍 فحص الأمان…");
-  const { looksLikeLiveStream, progressStatus, cachedExtract, saveExtractCache, recordDeadLink } = await import("../bot/product.server");
+  const { looksLikeLiveStream, progressStatus, cachedExtract, saveExtractCache } = await import("../bot/product.server");
   if (looksLikeLiveStream(job.url)) {
     throw new Error("هذا بث مباشر. أرسل المقطع بعد انتهائه، أو كليب جاهز.");
   }
-  await editStatus(chatId, mid, progressStatus("safe"));
+  await editStatus(chatId, mid, progressStatus("extract"));
   await assertSafeMedia(job.url);
   const { cachedTelegramFile } = await import("../bot/file-cache.server");
   const hit = await cachedTelegramFile(job.url).catch(() => null);
@@ -132,7 +131,6 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   const member = await getMember(fromId);
   const quota = member ? await downloadAccess(member) : { subscribed: false };
   const stamp = !isOwnerId(fromId) && !quota.subscribed;
-  await editStatus(chatId, mid, progressStatus("preview"));
   const live = await getJob(job.id);
   if (live?.status === "cancelled") throw new Error("cancelled");
   await markJobUploading(job.id).catch(() => undefined);

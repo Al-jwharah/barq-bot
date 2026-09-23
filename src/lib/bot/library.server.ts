@@ -80,6 +80,54 @@ function newPickId(): string {
   return randomBytes(5).toString("hex");
 }
 
+export async function rememberClip(
+  tgId: number,
+  clip: { url: string; title?: string; platform?: string; mediaUrl?: string; thumbnail?: string; kind?: string },
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    create table if not exists last_clips (
+      tg_id text primary key,
+      payload jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `;
+  await sql`
+    insert into last_clips (tg_id, payload)
+    values (${String(tgId)}, ${JSON.stringify(clip)})
+    on conflict (tg_id) do update set payload = excluded.payload, updated_at = now()
+  `;
+}
+
+export async function recallClip(tgId: number) {
+  const { lastClip, setLastClip } = await import("./session.server");
+  const mem = lastClip(tgId);
+  if (mem?.url) return mem;
+  const sql = await getSql();
+  await sql`
+    create table if not exists last_clips (
+      tg_id text primary key,
+      payload jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `;
+  const rows = await sql<{ payload: { url?: string; title?: string; platform?: string; mediaUrl?: string; thumbnail?: string; kind?: string } }>`
+    select payload from last_clips where tg_id = ${String(tgId)} limit 1
+  `;
+  const row = rows[0]?.payload;
+  if (!row?.url) return undefined;
+  const clip = {
+    url: row.url,
+    title: row.title,
+    platform: row.platform,
+    mediaUrl: row.mediaUrl,
+    thumbnail: row.thumbnail,
+    kind: row.kind,
+  };
+  setLastClip(tgId, clip);
+  return clip;
+}
+
 export async function saveMediaPick(tgId: number, chatId: number, payload: PickPayload): Promise<string> {
   const sql = await getSql();
   await ensure(sql);
