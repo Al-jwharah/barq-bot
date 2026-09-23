@@ -1,4 +1,4 @@
-import { BOT_USERNAME, SIGNATURE } from "./config.server";
+import { BOT_USERNAME, SIGNATURE, SUPPORT_URL } from "./config.server";
 
 export const RELIGIOUS_DISCLAIMER = "إن الله يراك. فاتقوا الله فيما تشاهدون.";
 
@@ -56,8 +56,21 @@ export function clipActionRows(
   const site = sourceUrl
     ? `https://abdulrhman.ai/?url=${encodeURIComponent(sourceUrl)}`
     : "https://abdulrhman.ai";
+  const shareTarget = sourceUrl || `https://t.me/${BOT_USERNAME.replace(/^@/, "")}`;
+  const share = `https://t.me/share/url?url=${encodeURIComponent(shareTarget)}&text=${encodeURIComponent("شوف هذا على برق ⚡️")}`;
   const rows: { text: string; url?: string; callback_data?: string }[][] = [
-    [{ text: "لخّصه وكابشن", callback_data: "ai:pack" }],
+    [
+      { text: "برق AI", callback_data: "go:ai" },
+      { text: "لخّصه", callback_data: "ai:pack" },
+    ],
+    [
+      { text: "شارك", url: share },
+      { text: "قيّم", callback_data: "rt:ask" },
+    ],
+    [
+      { text: "ادعمنا بقهوة", callback_data: "go:coffee" },
+      { text: "الدعم", url: SUPPORT_URL },
+    ],
     [{ text: "حمّله من الموقع", url: site }],
   ];
   if (accountUrl) rows.push([{ text: "حسابي", url: accountUrl }]);
