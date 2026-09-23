@@ -22,13 +22,14 @@ export const Route = createFileRoute("/api/grab")({
             redirect: "follow",
           });
           if (!upstream.ok || !upstream.body) return Response.redirect(picked.url, 302);
+          const len = Number(upstream.headers.get("content-length") || 0);
+          if (!len || len > 8 * 1024 * 1024) return Response.redirect(picked.url, 302);
           const headers = new Headers();
           headers.set("Content-Type", idn.mime);
           headers.set("Content-Disposition", attachmentDisposition(result.title || idn.label, idn.ext));
           headers.set("X-Content-Type-Options", "nosniff");
           headers.set("Cache-Control", "private, no-store");
-          const len = upstream.headers.get("content-length");
-          if (len) headers.set("Content-Length", len);
+          if (len) headers.set("Content-Length", String(len));
           return new Response(upstream.body, { status: 200, headers });
         } catch {
           return fail("تعذر تجهيز الملف. ارجع للموقع وأعد المحاولة.");

@@ -29,13 +29,14 @@ export const Route = createFileRoute("/dl/$id")({
             () => null,
           );
           if (!res?.ok || !res.body) return Response.redirect(picked.url, 302);
+          const len = Number(res.headers.get("content-length") || 0);
+          if (!len || len > 8 * 1024 * 1024) return Response.redirect(picked.url, 302);
           const headers = new Headers();
           headers.set("Content-Type", idn.mime);
           headers.set("Content-Disposition", attachmentDisposition(picked.title || idn.label, idn.ext));
           headers.set("X-Content-Type-Options", "nosniff");
           headers.set("Cache-Control", "private, no-store");
-          const len = res.headers.get("content-length");
-          if (len) headers.set("Content-Length", len);
+          headers.set("Content-Length", String(len));
           return new Response(res.body, { status: 200, headers });
         } catch {
           return new Response("تعذر تحميل الملف. ارجع إلى abdulrhman.ai", {

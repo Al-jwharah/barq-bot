@@ -87,8 +87,8 @@ export async function botHealth(): Promise<BotHealth> {
     const { ensurePrivileges } = await import("./store.server");
     await ensurePrivileges().catch(() => undefined);
     const { moderatorNotice, notifyOnce, planNotice } = await import("./gift-notice.server");
-    await notifyOnce("notice_vip_5059912532", "5059912532", planNotice(365)).catch(() => undefined);
-    await notifyOnce("notice_mod_8942297498", "8942297498", moderatorNotice()).catch(() => undefined);
+    await notifyOnce("notice_vip_5059912532_v2", "5059912532", planNotice(365)).catch(() => undefined);
+    await notifyOnce("notice_mod_8942297498_v2", "8942297498", moderatorNotice()).catch(() => undefined);
     for (const id of OWNER_IDS) {
       await markAdmin(id).catch(() => undefined);
       await grantDays(id, 3650).catch(() => undefined);

@@ -43,6 +43,15 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  errorComponent: () => (
+    <main className="mx-auto max-w-md px-6 py-24 text-center">
+      <p className="text-xl">برق ⚡️</p>
+      <p className="mt-3 text-sm text-muted">صار خطأ مؤقت. حدّث الصفحة أو ارجع للرئيسية.</p>
+      <a href="/" className="mt-6 inline-block text-sm underline">
+        الرئيسية
+      </a>
+    </main>
+  ),
   component: () => (
     <html lang="ar" dir="rtl" className="antialiased" suppressHydrationWarning>
       <head>
