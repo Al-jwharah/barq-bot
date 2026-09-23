@@ -586,21 +586,49 @@ export async function deliver(chatId: number, result: ExtractResult, stamp = fal
 }
 
 function prefersWebsite(result: ExtractResult): boolean {
-  const item = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
-  if (!item || item.kind === "photo" || item.kind === "audio") return false;
+  const item = result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") || result.items[0];
+  if (!item || item.kind === "photo") return false;
   if ((item.duration ?? 0) > 12 * 60) return true;
   const sizes = (item.variants ?? []).map((v) => v.size ?? 0).filter((n) => n > 0);
   return sizes.length > 0 && Math.min(...sizes) > 45 * 1024 * 1024;
 }
 
 async function sendHostedMedia(chatId: number, fromId: number, result: ExtractResult): Promise<number | null> {
-  const item = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
+  const item = result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") || result.items[0];
   if (!item) return null;
-  const page = `https://abdulrhman.ai/?url=${encodeURIComponent(result.sourceUrl)}`;
+  const variant = [...(item.variants ?? [])].sort(
+    (a, b) => (b.height ?? 0) - (a.height ?? 0) || (b.size ?? 0) - (a.size ?? 0),
+  )[0];
+  const media = variant?.url || item.url;
+  const { fileIdentity } = await import("../media/file-kind");
+  const idn = fileIdentity({
+    kind: item.kind,
+    url: media,
+    contentType: variant?.contentType,
+    duration: item.duration,
+  });
+  let href = `https://abdulrhman.ai/?url=${encodeURIComponent(result.sourceUrl)}`;
+  if (media) {
+    try {
+      const { createClipLink } = await import("./store.server");
+      const made = await createClipLink({
+        tgId: fromId,
+        url: result.sourceUrl,
+        mediaUrl: media,
+        thumbnail: item.thumbnail,
+        kind: item.kind,
+        platform: result.platform,
+      });
+      href = `https://abdulrhman.ai/dl/${made.id}`;
+    } catch {
+      /* page fallback */
+    }
+  }
   const markup = await clipMarkup(fromId, result.sourceUrl);
+  markup.inline_keyboard.unshift([{ text: "تحميل الملف", url: href }]);
   const sent = await telegram.sendMessage(
     chatId,
-    `المقطع كبير على تليجرام.\nالتحميل المباشر من الموقع:\n${page}`,
+    `تنبيه\nالملف أكبر من تليجرام.\nالنوع: ${idn.label}\nالصيغة: ${idn.ext.toUpperCase()}\nاضغط الرابط ليبدأ تحميل الملف:\n${href}`,
     { reply_markup: markup },
   );
   return sent.message_id ?? null;

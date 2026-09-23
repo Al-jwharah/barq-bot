@@ -398,13 +398,6 @@ function ResultCard({ result }: { result: ExtractResult }) {
   );
 }
 
-function bestUrl(item: MediaItem): string {
-  const ranked = [...item.variants].sort(
-    (a, b) => (b.height ?? 0) - (a.height ?? 0) || (b.size ?? 0) - (a.size ?? 0),
-  );
-  return ranked[0]?.url || item.url;
-}
-
 function playbackUrl(item: MediaItem): string {
   if (item.kind === "photo") return item.url;
   const ranked = [...item.variants];
@@ -478,11 +471,12 @@ function QualityRow({
       </div>
       <div className="mb-3">
         <a
-          href={fileUrl(bestUrl(item), "barq.mp4")}
+          href={`/api/grab?src=${encodeURIComponent(result.sourceUrl)}`}
           className="inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm text-accent-fg"
         >
-          تحميل مباشر
+          تحميل الملف
         </a>
+        <p className="mt-2 text-xs text-muted">ملف مباشر. المتصفح يتعرّف على الصيغة: فيديو أو أغنية أو فلم أو تطبيق.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         {variants.map((v) => {
