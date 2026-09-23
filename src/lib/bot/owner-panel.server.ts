@@ -402,6 +402,8 @@ export async function handleOwnerAwait(
       return true;
     }
     await store.grantDays(tgId, days);
+    const { notifyUser, planNotice } = await import("./gift-notice.server");
+    await notifyUser(tgId, planNotice(days));
     await telegram.sendMessage(chatId, `تم منح ${days} يوم للمستخدم ${tgId}`);
     return true;
   }
@@ -413,6 +415,10 @@ export async function handleOwnerAwait(
       return true;
     }
     await store.setSubscriptionDays(tgId, days);
+    if (days > 0) {
+      const { notifyUser, planNotice } = await import("./gift-notice.server");
+      await notifyUser(tgId, planNotice(days));
+    }
     await telegram.sendMessage(
       chatId,
       days <= 0 ? `أُلغي اشتراك ${tgId}` : `اشتراك ${tgId} صار ${days} يوم من الآن`,
