@@ -301,57 +301,36 @@ async function extractCobalt(url: string, id: string): Promise<ExtractResult | n
   return null;
 }
 
-function assertFitsTelegram(result: ExtractResult) {
-  const item = result.items[0];
-  const duration = item?.duration ?? 0;
-  const smallest =
-    [...(item?.variants ?? [])]
-      .map((v) => v.size ?? 0)
-      .filter((n) => n > 0)
-      .sort((a, b) => a - b)[0] ?? 0;
-  if (smallest > 45 * 1024 * 1024 || duration > 12 * 60) {
-    const mins = Math.max(1, Math.round(duration / 60));
-    throw new Error(
-      `هذا المقطع ${mins} دقيقة وأكبر من حد تليجرام (50 ميغابايت). أرسل شورتس أو فيديو أقصر.`,
-    );
-  }
-}
-
 export async function extractYouTube(url: string): Promise<ExtractResult> {
   const id = youtubeIdFromUrl(url);
   if (!id) throw new Error("هذا مو رابط يوتيوب واضح");
   const watch = `https://www.youtube.com/watch?v=${id}`;
-
-  const finish = (result: ExtractResult) => {
-    assertFitsTelegram(result);
-    return result;
-  };
 
   for (const client of CLIENTS) {
     try {
       const player = await innertube(id, client);
       if (player.playabilityStatus?.status === "LOGIN_REQUIRED") continue;
       const variants = muxedVariants(player);
-      if (variants.length) return finish(fromPlayer(id, player, variants));
+      if (variants.length) return fromPlayer(id, player, variants);
     } catch {
       /* next client */
     }
   }
 
   const piped = await extractPiped(id);
-  if (piped) return finish(piped);
+  if (piped) return piped;
 
   const invidious = await extractInvidious(id);
-  if (invidious) return finish(invidious);
+  if (invidious) return invidious;
 
   const cobalt = await extractCobalt(watch, id);
-  if (cobalt) return finish(cobalt);
+  if (cobalt) return cobalt;
 
   try {
-    return finish(await extractWithYtdlp(watch, "youtube"));
+    return await extractWithYtdlp(watch, "youtube");
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
     if (msg.includes("تحقق") || msg.includes("تليجرام")) throw err;
-    throw new Error("ما قدرت أحمّل فيديو يوتيوب. أرسل شورتس أو فيديو أقصر من 12 دقيقة.");
+    throw new Error("ما قدرت أجيب ملف يوتيوب. افتح الرابط من الموقع للتحميل المباشر.");
   }
 }

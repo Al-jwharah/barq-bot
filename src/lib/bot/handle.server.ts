@@ -398,7 +398,7 @@ function estimatedBytes(v: { size?: number; bitrate?: number }, duration?: numbe
   return undefined;
 }
 
-async function clipMarkup(chatId: number) {
+async function clipMarkup(chatId: number, sourceUrl?: string) {
   let accountUrl: string | undefined;
   if (chatId > 0) {
     try {
@@ -408,7 +408,7 @@ async function clipMarkup(chatId: number) {
       accountUrl = undefined;
     }
   }
-  return inlineKeyboard(clipActionRows(accountUrl));
+  return inlineKeyboard(clipActionRows(accountUrl, sourceUrl));
 }
 
 async function sendVideoItem(
@@ -431,7 +431,7 @@ async function sendVideoItem(
   }
   const capKind = item.kind === "audio" ? "audio" : "video";
   const cap = withCaption ? signatureCaption(capKind, result.platform, result.sourceUrl) : undefined;
-  const markup = await clipMarkup(chatId);
+  const markup = await clipMarkup(chatId, result.sourceUrl);
   const extra: Record<string, unknown> = { reply_markup: markup };
   if (item.kind !== "audio") extra.supports_streaming = true;
   if (cap) extra.caption = cap;
@@ -529,7 +529,7 @@ async function sendPhotoItem(
   stamp: boolean,
 ): Promise<number | null> {
   const cap = withCaption ? signatureCaption("photo", result.platform, result.sourceUrl) : undefined;
-  const markup = await clipMarkup(chatId);
+  const markup = await clipMarkup(chatId, result.sourceUrl);
   const photoExtra: Record<string, unknown> = { reply_markup: markup };
   if (cap) photoExtra.caption = cap;
   if (!stamp) {
@@ -555,6 +555,10 @@ async function sendPhotoItem(
 }
 
 export async function deliver(chatId: number, result: ExtractResult, stamp = false, fromId?: number): Promise<number[]> {
+  if (prefersWebsite(result)) {
+    const hosted = await sendHostedMedia(chatId, fromId ?? chatId, result);
+    return hosted ? [hosted] : [];
+  }
   const preferred = result.items.some((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio")
     ? result.items.filter((i) => i.kind !== "photo")
     : result.items;
@@ -581,27 +585,23 @@ export async function deliver(chatId: number, result: ExtractResult, stamp = fal
   return ids;
 }
 
+function prefersWebsite(result: ExtractResult): boolean {
+  const item = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
+  if (!item || item.kind === "photo" || item.kind === "audio") return false;
+  if ((item.duration ?? 0) > 12 * 60) return true;
+  const sizes = (item.variants ?? []).map((v) => v.size ?? 0).filter((n) => n > 0);
+  return sizes.length > 0 && Math.min(...sizes) > 45 * 1024 * 1024;
+}
+
 async function sendHostedMedia(chatId: number, fromId: number, result: ExtractResult): Promise<number | null> {
   const item = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
   if (!item) return null;
-  const url =
-    [...(item.variants ?? [])].sort((a, b) => (a.height ?? 0) - (b.height ?? 0))[0]?.url || item.url;
-  if (!url) return null;
-  const { createClipLink } = await import("./store.server");
-  const origin = await clipOrigin();
-  const made = await createClipLink({
-    tgId: fromId,
-    url: result.sourceUrl,
-    mediaUrl: url,
-    thumbnail: item.thumbnail,
-    kind: item.kind,
-    platform: result.platform,
-  });
-  const short = `${origin}/d/${made.id}`;
+  const page = `https://abdulrhman.ai/?url=${encodeURIComponent(result.sourceUrl)}`;
+  const markup = await clipMarkup(fromId, result.sourceUrl);
   const sent = await telegram.sendMessage(
     chatId,
-    `المقطع أكبر من حد تليجرام (٥٠ ميغا).\nرابط التحميل الكامل:\n${short}`,
-    { reply_markup: inlineKeyboard([[{ text: "تحميل الملف", url: short }]]) },
+    `المقطع كبير على تليجرام.\nالتحميل المباشر من الموقع:\n${page}`,
+    { reply_markup: markup },
   );
   return sent.message_id ?? null;
 }
@@ -1256,16 +1256,17 @@ async function handleCallback(cb: TgCallbackQuery) {
     await telegram.sendMessage(targetChat, `طابورك\n${lines.join("\n")}`);
     return;
   }
-  if (data === "ai:analyze") {
-    await telegram.answerCallback(cb.id, "تحليل…");
+  if (data === "ai:pack" || data === "ai:analyze" || data === "ai:studio") {
+    await telegram.answerCallback(cb.id, "الذكاء يشتغل…");
     await telegram.sendChatAction(targetChat, "typing");
-    await handleAnalyze(targetChat, fromId, member);
-    return;
-  }
-  if (data === "ai:studio") {
-    await telegram.answerCallback(cb.id, "تجهيز…");
-    await telegram.sendChatAction(targetChat, "typing");
-    await handleStudio(targetChat, fromId, member);
+    if (data === "ai:pack") {
+      const { packClip } = await import("./analyze.server");
+      const text = await packClip(fromId);
+      await telegram.sendMessage(targetChat, text.slice(0, 4000));
+      return;
+    }
+    if (data === "ai:analyze") await handleAnalyze(targetChat, fromId, member);
+    else await handleStudio(targetChat, fromId, member);
     return;
   }
   if (data === "pt:redeem") {

@@ -123,6 +123,11 @@ function Home() {
     } catch {
       /* ignore */
     }
+    const q = new URLSearchParams(window.location.search).get("url");
+    if (q && /^https?:\/\//i.test(q)) {
+      setUrl(q);
+      void onResolve(q);
+    }
     const t = setInterval(() => {
       void getStatus()
         .then(setStatus)
@@ -393,6 +398,13 @@ function ResultCard({ result }: { result: ExtractResult }) {
   );
 }
 
+function bestUrl(item: MediaItem): string {
+  const ranked = [...item.variants].sort(
+    (a, b) => (b.height ?? 0) - (a.height ?? 0) || (b.size ?? 0) - (a.size ?? 0),
+  );
+  return ranked[0]?.url || item.url;
+}
+
 function playbackUrl(item: MediaItem): string {
   if (item.kind === "photo") return item.url;
   const ranked = [...item.variants];
@@ -463,6 +475,14 @@ function QualityRow({
           {result.items.length > 1 ? ` ${index + 1}` : ""}
           {formatDuration(item.duration) ? ` · ${formatDuration(item.duration)}` : ""}
         </p>
+      </div>
+      <div className="mb-3">
+        <a
+          href={fileUrl(bestUrl(item), "barq.mp4")}
+          className="inline-flex h-11 items-center rounded-full bg-accent px-5 text-sm text-accent-fg"
+        >
+          تحميل مباشر
+        </a>
       </div>
       <div className="flex flex-wrap gap-2">
         {variants.map((v) => {

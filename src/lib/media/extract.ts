@@ -170,7 +170,14 @@ export async function extractMedia(input: string): Promise<ExtractResult> {
 
   const tryOne = async (fn: () => Promise<ExtractResult>) => {
     const result = await fn();
-    if (result.items.length) return fitTelegramCloud(result);
+    if (result.items.length) {
+      try {
+        return fitTelegramCloud(result);
+      } catch (err) {
+        if (isFileTooLarge(err)) return result;
+        throw err;
+      }
+    }
     throw new Error("لا يوجد ملف");
   };
 
@@ -216,7 +223,14 @@ export async function extractMedia(input: string): Promise<ExtractResult> {
   try {
     const { grokFindDirectMedia } = await import("../bot/grok.server");
     const found = await grokFindDirectMedia(url);
-    if (found?.items.length) return fitTelegramCloud(found);
+    if (found?.items.length) {
+      try {
+        return fitTelegramCloud(found);
+      } catch (err) {
+        if (isFileTooLarge(err)) return found;
+        throw err;
+      }
+    }
   } catch {
     /* grok is optional */
   }

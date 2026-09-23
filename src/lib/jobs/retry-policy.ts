@@ -49,7 +49,7 @@ export function userFailMessage(raw: string): string {
     return "انتهت صلاحية الرابط. أرسل رابطًا جديدًا.";
   }
   if (/too large|payload too large|file size|50\s*mb|أكبر من حد|حجم الملف|oversize_host/.test(s)) {
-    return "المقطع أكبر من حد تليجرام. أعد إرسال الرابط بعد التحديث.";
+    return "المقطع أكبر من تليجرام. حمّله مباشرة من abdulrhman.ai";
   }
   if (/blocked|nsfw|adult/.test(s)) return "تعذر تحميل هذا المحتوى.";
   if (/timeout|timed out|etimedout|download_timeout|aborted/.test(s)) return "انتهت مهلة المصدر. حاول لاحقًا.";

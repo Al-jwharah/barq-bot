@@ -58,19 +58,19 @@ abdulrhman.ai
 @${handle}`;
 }
 
-export function clipActionRows(accountUrl?: string): { text: string; url?: string; callback_data?: string }[][] {
-  const second: { text: string; url?: string; callback_data?: string }[] = [
-    { text: "رابط مؤقت", callback_data: "go:short" },
-    { text: "الموقع", url: "https://abdulrhman.ai" },
+export function clipActionRows(
+  accountUrl?: string,
+  sourceUrl?: string,
+): { text: string; url?: string; callback_data?: string }[][] {
+  const site = sourceUrl
+    ? `https://abdulrhman.ai/?url=${encodeURIComponent(sourceUrl)}`
+    : "https://abdulrhman.ai";
+  const rows: { text: string; url?: string; callback_data?: string }[][] = [
+    [{ text: "لخّصه وكابشن", callback_data: "ai:pack" }],
+    [{ text: "حمّله من الموقع", url: site }],
   ];
-  if (accountUrl) second.push({ text: "حسابي", url: accountUrl });
-  return [
-    [
-      { text: "لخّصه", callback_data: "ai:analyze" },
-      { text: "كابشن", callback_data: "ai:studio" },
-    ],
-    second,
-  ];
+  if (accountUrl) rows.push([{ text: "حسابي", url: accountUrl }]);
+  return rows;
 }
 
 export const TRY_BOT_LABEL = "جرب البوت الآن ⚡️";

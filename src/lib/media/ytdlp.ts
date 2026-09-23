@@ -479,7 +479,7 @@ export async function extractWithYtdlp(url: string, platform = "generic"): Promi
       const info = await dump(url, args);
       const items = pickItems(info);
       if (items.length === 0) continue;
-      return fitTelegramCloud({
+      const raw = {
         platform,
         id: info.id,
         title: info.title,
@@ -487,7 +487,14 @@ export async function extractWithYtdlp(url: string, platform = "generic"): Promi
         text: info.title,
         sourceUrl: info.webpage_url || url,
         items,
-      });
+      };
+      try {
+        return fitTelegramCloud(raw);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "";
+        if (/أكبر من حد|too large|file size|file_too_large/i.test(message)) return raw;
+        throw err;
+      }
     } catch (err) {
       lastErr = err;
     }

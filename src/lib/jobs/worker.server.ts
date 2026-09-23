@@ -119,7 +119,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     const { clipActionRows, clipCaption } = await import("../bot/brand");
     const { inlineKeyboard } = await import("../bot/telegram.server");
     const cap = clipCaption("barq_ibot");
-    const markup = inlineKeyboard(clipActionRows(accountUrl));
+    const markup = inlineKeyboard(clipActionRows(accountUrl, job.url));
     if (hit.kind === "audio") await telegram.sendAudioUrl(chatId, hit.fileId, { caption: cap, reply_markup: markup });
     else await telegram.sendVideoUrl(chatId, hit.fileId, { caption: cap, supports_streaming: true, reply_markup: markup });
     await sendAfterDownload(chatId);
