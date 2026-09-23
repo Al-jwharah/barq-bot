@@ -18,7 +18,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "برق ⚡️ حمّل أي فيديو. Barq AI يفهمك. مجاني — كوب قهوة إن أحببت. الدعم @i_2169 · info@aljwharah.ai",
+          "برق لتحميل فيديو تيك توك وإنستغرام ويوتيوب وإكس وفيسبوك بدون تطبيق. الصق الرابط في تليجرام ويصلك الملف. مجاني. abdulrhman.ai",
       },
       ...(PUBLIC_ORIGIN
         ? [

@@ -36,7 +36,7 @@ const HISTORY_KEY = "barq-history";
 const FEATURES = [
   { title: "أي رابط", body: "يوتيوب، تيك توك، إنستغرام، إكس، فيسبوك أو ملف مباشر — الصق وانتهى." },
   { title: "Barq AI", body: "اكتب لخّص الفيديو، اشرح، حوّل فكرة. يفهم الشات ويرد مباشرة." },
-  { title: "مجاني + كوب قهوة", body: "التحميل مجاني. إن أحببت ادعم من 10 إلى 250 نجمة أو USDT على TON." },
+  { title: "مجاني", body: "التحميل مجاني. الحساب يفتح من زر تحت كل مقطع." },
 ];
 
 function loadHistory(): HistoryEntry[] {
@@ -280,6 +280,21 @@ function Home() {
           </article>
         ))}
       </section>
+
+      <nav className="mt-6 flex flex-wrap gap-2 text-xs">
+        {[
+          ["/tiktok", "تيك توك"],
+          ["/instagram", "إنستغرام"],
+          ["/youtube", "يوتيوب"],
+          ["/x", "إكس"],
+          ["/facebook", "فيسبوك"],
+          ["/snapchat", "سناب"],
+        ].map(([href, label]) => (
+          <a key={href} href={href} className="rounded-full border border-subtle px-3 py-1 text-muted">
+            تحميل {label}
+          </a>
+        ))}
+      </nav>
 
       <section className="mt-8">
         <p className="mb-3 text-sm text-muted">أو الصق الرابط هنا</p>

@@ -175,7 +175,10 @@ export async function downloadAccess(member: Member): Promise<DownloadAccess> {
   if (s.paused) {
     return finish({ ok: false, remaining: 0, subscribed: false, needJoin: false, ...base });
   }
-  if (s.dailyCapOn || TEMP_FREE) {
+  if (TEMP_FREE) {
+    return finish({ ok: true, remaining: -1, subscribed: false, needJoin: false, ...base, paused: false });
+  }
+  if (s.dailyCapOn) {
     const { todayDownloads } = await import("./store.server");
     const used = await todayDownloads(member.tg_id);
     let remaining = Math.max(0, DAILY_CAP - used);

@@ -109,10 +109,17 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   if (hit?.fileId) {
     await editStatus(chatId, mid, progressStatus("upload", "من الكاش"));
     await markJobUploading(job.id).catch(() => undefined);
+    let accountUrl: string | undefined;
+    try {
+      const { issueAccountLink } = await import("../bot/account.server");
+      accountUrl = await issueAccountLink(fromId);
+    } catch {
+      accountUrl = undefined;
+    }
     const { clipActionRows, clipCaption } = await import("../bot/brand");
     const { inlineKeyboard } = await import("../bot/telegram.server");
     const cap = clipCaption("barq_ibot");
-    const markup = inlineKeyboard(clipActionRows());
+    const markup = inlineKeyboard(clipActionRows(accountUrl));
     if (hit.kind === "audio") await telegram.sendAudioUrl(chatId, hit.fileId, { caption: cap, reply_markup: markup });
     else await telegram.sendVideoUrl(chatId, hit.fileId, { caption: cap, supports_streaming: true, reply_markup: markup });
     await sendAfterDownload(chatId);

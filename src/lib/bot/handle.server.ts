@@ -398,6 +398,19 @@ function estimatedBytes(v: { size?: number; bitrate?: number }, duration?: numbe
   return undefined;
 }
 
+async function clipMarkup(chatId: number) {
+  let accountUrl: string | undefined;
+  if (chatId > 0) {
+    try {
+      const { issueAccountLink } = await import("./account.server");
+      accountUrl = await issueAccountLink(chatId);
+    } catch {
+      accountUrl = undefined;
+    }
+  }
+  return inlineKeyboard(clipActionRows(accountUrl));
+}
+
 async function sendVideoItem(
   chatId: number,
   result: ExtractResult,
@@ -418,7 +431,7 @@ async function sendVideoItem(
   }
   const capKind = item.kind === "audio" ? "audio" : "video";
   const cap = withCaption ? signatureCaption(capKind, result.platform, result.sourceUrl) : undefined;
-  const markup = inlineKeyboard(clipActionRows());
+  const markup = await clipMarkup(chatId);
   const extra: Record<string, unknown> = { reply_markup: markup };
   if (item.kind !== "audio") extra.supports_streaming = true;
   if (cap) extra.caption = cap;
@@ -516,7 +529,7 @@ async function sendPhotoItem(
   stamp: boolean,
 ): Promise<number | null> {
   const cap = withCaption ? signatureCaption("photo", result.platform, result.sourceUrl) : undefined;
-  const markup = inlineKeyboard(clipActionRows());
+  const markup = await clipMarkup(chatId);
   const photoExtra: Record<string, unknown> = { reply_markup: markup };
   if (cap) photoExtra.caption = cap;
   if (!stamp) {

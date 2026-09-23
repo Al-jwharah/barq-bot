@@ -58,16 +58,18 @@ abdulrhman.ai
 @${handle}`;
 }
 
-export function clipActionRows(): { text: string; url?: string; callback_data?: string }[][] {
+export function clipActionRows(accountUrl?: string): { text: string; url?: string; callback_data?: string }[][] {
+  const second: { text: string; url?: string; callback_data?: string }[] = [
+    { text: "رابط مؤقت", callback_data: "go:short" },
+    { text: "الموقع", url: "https://abdulrhman.ai" },
+  ];
+  if (accountUrl) second.push({ text: "حسابي", url: accountUrl });
   return [
     [
       { text: "لخّصه", callback_data: "ai:analyze" },
       { text: "كابشن", callback_data: "ai:studio" },
     ],
-    [
-      { text: "رابط مؤقت", callback_data: "go:short" },
-      { text: "الموقع", url: "https://abdulrhman.ai" },
-    ],
+    second,
   ];
 }
 

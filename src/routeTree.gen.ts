@@ -12,10 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as FacebookRouteImport } from './routes/facebook'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as InstagramRouteImport } from './routes/instagram'
 import { Route as LegalRouteImport } from './routes/legal'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SnapchatRouteImport } from './routes/snapchat'
 import { Route as TiktokRouteImport } from './routes/tiktok'
+import { Route as XRouteImport } from './routes/x'
 import { Route as YoutubeRouteImport } from './routes/youtube'
 import { Route as ApiBackupRouteImport } from './routes/api/backup'
 import { Route as ApiFileRouteImport } from './routes/api/file'
@@ -44,6 +49,11 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FacebookRoute = FacebookRouteImport.update({
+  id: '/facebook',
+  path: '/facebook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
@@ -59,9 +69,29 @@ const LegalRoute = LegalRouteImport.update({
   path: '/legal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SnapchatRoute = SnapchatRouteImport.update({
+  id: '/snapchat',
+  path: '/snapchat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TiktokRoute = TiktokRouteImport.update({
   id: '/tiktok',
   path: '/tiktok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const XRoute = XRouteImport.update({
+  id: '/x',
+  path: '/x',
   getParentRoute: () => rootRouteImport,
 } as any)
 const YoutubeRoute = YoutubeRouteImport.update({
@@ -129,10 +159,15 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/facebook': typeof FacebookRoute
   '/faq': typeof FaqRoute
   '/instagram': typeof InstagramRoute
   '/legal': typeof LegalRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/snapchat': typeof SnapchatRoute
   '/tiktok': typeof TiktokRoute
+  '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
@@ -150,10 +185,15 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/facebook': typeof FacebookRoute
   '/faq': typeof FaqRoute
   '/instagram': typeof InstagramRoute
   '/legal': typeof LegalRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/snapchat': typeof SnapchatRoute
   '/tiktok': typeof TiktokRoute
+  '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
@@ -172,10 +212,15 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
+  '/facebook': typeof FacebookRoute
   '/faq': typeof FaqRoute
   '/instagram': typeof InstagramRoute
   '/legal': typeof LegalRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/snapchat': typeof SnapchatRoute
   '/tiktok': typeof TiktokRoute
+  '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
@@ -195,10 +240,15 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/admin'
+    | '/facebook'
     | '/faq'
     | '/instagram'
     | '/legal'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/snapchat'
     | '/tiktok'
+    | '/x'
     | '/youtube'
     | '/api/backup'
     | '/api/file'
@@ -216,10 +266,15 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/admin'
+    | '/facebook'
     | '/faq'
     | '/instagram'
     | '/legal'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/snapchat'
     | '/tiktok'
+    | '/x'
     | '/youtube'
     | '/api/backup'
     | '/api/file'
@@ -237,10 +292,15 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/admin'
+    | '/facebook'
     | '/faq'
     | '/instagram'
     | '/legal'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/snapchat'
     | '/tiktok'
+    | '/x'
     | '/youtube'
     | '/api/backup'
     | '/api/file'
@@ -259,10 +319,15 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRoute
+  FacebookRoute: typeof FacebookRoute
   FaqRoute: typeof FaqRoute
   InstagramRoute: typeof InstagramRoute
   LegalRoute: typeof LegalRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  SnapchatRoute: typeof SnapchatRoute
   TiktokRoute: typeof TiktokRoute
+  XRoute: typeof XRoute
   YoutubeRoute: typeof YoutubeRoute
   ApiBackupRoute: typeof ApiBackupRoute
   ApiFileRoute: typeof ApiFileRoute
@@ -300,6 +365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/facebook': {
+      id: '/facebook'
+      path: '/facebook'
+      fullPath: '/facebook'
+      preLoaderRoute: typeof FacebookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/faq': {
       id: '/faq'
       path: '/faq'
@@ -321,11 +393,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/snapchat': {
+      id: '/snapchat'
+      path: '/snapchat'
+      fullPath: '/snapchat'
+      preLoaderRoute: typeof SnapchatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tiktok': {
       id: '/tiktok'
       path: '/tiktok'
       fullPath: '/tiktok'
       preLoaderRoute: typeof TiktokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/x': {
+      id: '/x'
+      path: '/x'
+      fullPath: '/x'
+      preLoaderRoute: typeof XRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/youtube': {
@@ -419,10 +519,15 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AdminRoute: AdminRoute,
+  FacebookRoute: FacebookRoute,
   FaqRoute: FaqRoute,
   InstagramRoute: InstagramRoute,
   LegalRoute: LegalRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  SnapchatRoute: SnapchatRoute,
   TiktokRoute: TiktokRoute,
+  XRoute: XRoute,
   YoutubeRoute: YoutubeRoute,
   ApiBackupRoute: ApiBackupRoute,
   ApiFileRoute: ApiFileRoute,
