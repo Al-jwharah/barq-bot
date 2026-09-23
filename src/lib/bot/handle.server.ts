@@ -1385,7 +1385,7 @@ async function handleCallback(cb: TgCallbackQuery) {
     await telegram.answerCallback(cb.id);
     await telegram.sendMessage(
       targetChat,
-      "أنا Barq AI. اكتب أي شيء: لخّص الفيديو، اشرح، حوّل فكرة، أو الصق رابطًا للتحميل.",
+      "أنا برق AI. اكتب أي شيء: لخّص الفيديو، اشرح، حوّل فكرة، أو الصق رابطًا للتحميل.",
       { reply_markup: await keysFor(fromId, member) },
     );
     return;
@@ -1607,6 +1607,12 @@ export async function assertSafeMedia(url: string, result?: ExtractResult) {
     for (const item of result.items) {
       if (item.url) await assertSafeOutboundUrl(item.url).catch(() => undefined);
     }
+  }
+  try {
+    const { assertAdultVisual } = await import("./visual-guard.server");
+    await assertAdultVisual(url, result);
+  } catch (err) {
+    if (err instanceof MediaBlockedError) throw err;
   }
   try {
     const { extraBlockKeywords } = await import("./product.server");
@@ -2321,7 +2327,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     }
     await telegram.sendMessage(
       chatId,
-      `أنا Barq AI. اكتب أي شيء: لخّص الفيديو، ابحث عن مقطع، اشرح، أو حوّل فكرة.\n${BARQ_AI_DAILY} رسائل يوميًا. التحميل مجاني — الصق الرابط.`,
+      `أنا برق AI. اكتب أي شيء: لخّص الفيديو، ابحث عن مقطع، اشرح، أو حوّل فكرة.\n${BARQ_AI_DAILY} رسائل يوميًا. التحميل مجاني — الصق الرابط.`,
       { reply_markup: await keysFor(fromId, member) },
     );
     return;
@@ -2482,6 +2488,9 @@ async function ackStart(_update: TgUpdate): Promise<boolean> {
 }
 
 export async function handleUpdate(update: TgUpdate) {
+  void import("./remind.server")
+    .then((m) => m.maybeHourlyReminder())
+    .catch(() => undefined);
   await ackStart(update).catch(() => undefined);
   const { receiveTelegramUpdate, markTelegramUpdateProcessed, markTelegramUpdateFailed, updateTypeOf } =
     await import("./telegram-updates.server");

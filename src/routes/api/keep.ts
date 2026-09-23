@@ -35,14 +35,14 @@ async function probePauseSend() {
   await setSetting("bot_paused", "on");
   await telegram.sendMessage(
     Number(OWNER_TG_ID),
-    "اختبار Vercel: البوت توقف لحظيًا.\nالتوكن موجود. جروك " +
+    "اختبار Vercel: البوت توقف لحظيًا.\nالتوكن موجود. برق AI " +
       (grokReady() ? "جاهز" : "غير جاهز") +
       ".",
   );
   await setSetting("bot_paused", "off");
   await telegram.sendMessage(
     Number(OWNER_TG_ID),
-    `عاد يعمل على Vercel ⚡️\nجروك: ${grokReady() ? "يعمل" : "لا"}\nالتوكن: ${TELEGRAM_BOT_TOKEN ? "مضبوط" : "ناقص"}`,
+    `عاد يعمل على Vercel ⚡️\nبرق AI: ${grokReady() ? "يعمل" : "لا"}\nالتوكن: ${TELEGRAM_BOT_TOKEN ? "مضبوط" : "ناقص"}`,
   );
   await flushDb().catch(() => undefined);
   return { probe: "ok", grok: grokReady(), token: Boolean(TELEGRAM_BOT_TOKEN), paused: false };

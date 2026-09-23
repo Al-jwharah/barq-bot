@@ -50,7 +50,7 @@ async function homeText(): Promise<string> {
   return `لوحة تحكم برق
 
 البوت: ${s.paused ? "متوقف" : "يعمل"}
-جروك: ${grok} · ${speedLabel(s.grokSpeed)}
+برق AI: ${grok} · ${speedLabel(s.grokSpeed)}
 القناة: ${channel} · المجاني ${s.freeDownloads}
 
 أعضاء ${stats.members} · مشتركون ${stats.subscribers} · تحميلات ${stats.downloads}
@@ -58,7 +58,7 @@ async function homeText(): Promise<string> {
 الطابور: ${q ? `${q.pending} انتظار · ${q.processing} جاري · ${q.failedToday} فشل اليوم` : "—"}
 معجبون ${(await (await import("./growth.server")).likeCount())}
 
-أول زر: اختيار نموذج جروك.`;
+أول زر: اختيار نموذج برق AI.`;
 }
 
 async function homeButtons(s: BotSettings, role: Role = "owner"): Promise<TgBtn[][]> {
@@ -296,7 +296,7 @@ export async function sendOwnerNews(chatId: number) {
 
 ${list}
 
-انشر تحديثًا، ابدأ مسابقة، أو اكتب لجروك.`,
+انشر تحديثًا، ابدأ مسابقة، أو اكتب لبرق AI.`,
     {
       reply_markup: inlineKeyboard([
         [
@@ -304,7 +304,7 @@ ${list}
           { text: "بدء مسابقة", callback_data: "adm:contest" },
         ],
         [{ text: "اسحب فائز", callback_data: "adm:draw" }],
-        [{ text: "جروك", callback_data: "adm:grok_on" }],
+        [{ text: "برق AI", callback_data: "adm:grok_on" }],
         [{ text: "رجوع للوحة", callback_data: "adm:home" }],
       ]),
     },
@@ -598,7 +598,7 @@ export async function handleOwnerPanelCallback(cb: TgCallbackQuery): Promise<voi
       await telegram.answerCallback(cb.id, "للمالك فقط", true);
       return;
     }
-    await telegram.answerCallback(cb.id, "جروك يسمعك");
+    await telegram.answerCallback(cb.id, "برق AI يسمعك");
     await enterGrokMode(chatId, fromId);
     return;
   }
@@ -745,7 +745,7 @@ export async function handleOwnerPanelCallback(cb: TgCallbackQuery): Promise<voi
     const likes = await (await import("./growth.server")).likeCount();
     await telegram.sendMessage(
       chatId,
-      `إحصائيات برق\nأعضاء ${stats.members}\nمعجبون ${likes}\nتحميلات ${stats.downloads}\nحجب ${stats.blocked}\nفشل ${stats.failed}\nروابط ${stats.clips}\nنجوم ${stats.stars}\nجروك ${grokReady() && s.grokOwner ? grokModelLabel(s.grokModel) : "متوقف"}`,
+      `إحصائيات برق\nأعضاء ${stats.members}\nمعجبون ${likes}\nتحميلات ${stats.downloads}\nحجب ${stats.blocked}\nفشل ${stats.failed}\nروابط ${stats.clips}\nنجوم ${stats.stars}\nبرق AI ${grokReady() && s.grokOwner ? grokModelLabel(s.grokModel) : "متوقف"}`,
       { reply_markup: OWNER_KEYBOARD },
     );
     return;
@@ -833,7 +833,7 @@ export async function sendWatch(chatId: number, _fromId: number) {
     : "لا حجب إباحي مسجّل.";
   await telegram.sendMessage(
     chatId,
-    `مراقبة برق\nأعضاء ${stats.members} · تحميلات ${stats.downloads} · حجب ${stats.blocked} · فشل ${stats.failed}\nجروك: ${grokReady() ? grokModelLabel(s.grokModel) : "غير متصل"}\n\nآخر التحميلات:\n${logLines}\n\nالحجب:\n${blockLines}`,
+    `مراقبة برق\nأعضاء ${stats.members} · تحميلات ${stats.downloads} · حجب ${stats.blocked} · فشل ${stats.failed}\nبرق AI: ${grokReady() ? grokModelLabel(s.grokModel) : "غير متصل"}\n\nآخر التحميلات:\n${logLines}\n\nالحجب:\n${blockLines}`,
     { reply_markup: OWNER_KEYBOARD },
   );
 }

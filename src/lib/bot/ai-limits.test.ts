@@ -82,21 +82,18 @@ test("parseGrokMediaHint only accepts https media URLs", () => {
   assert.equal(parseGrokMediaHint('{"media_url":"","kind":"video"}'), null);
 });
 
-test("vault captions use telegram id only and omit name/username", () => {
+test("vault captions prefer the requester name", () => {
   const withNames = archiveWhoLine({ id: 8471762251, name: "Ali", username: "ali" });
   const without = archiveWhoLine({ id: 8471762251 });
-  assert.equal(withNames, "طلب: 8471762251");
+  assert.equal(withNames, "طلب: Ali");
   assert.equal(without, "طلب: 8471762251");
-  assert.equal(withNames.includes("Ali"), false);
-  assert.equal(withNames.includes("ali"), false);
   const caption = archiveCaption({
     who: { id: 99, name: "Secret", username: "hidden" },
     sourceUrl: "https://example.com/v",
   });
-  assert.match(caption, /طلب: 99/);
-  assert.equal(caption.includes("Secret"), false);
-  assert.equal(caption.includes("hidden"), false);
+  assert.match(caption, /طلب: Secret/);
   assert.equal(archiveWhoLine(undefined), "طلب: مجهول");
+  assert.equal(archiveWhoLine({ id: 1, username: "barq" }), "طلب: @barq");
 });
 
 test("known filesize over TELEGRAM_CLOUD_MAX_MB is FILE_TOO_LARGE", () => {

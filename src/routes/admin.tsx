@@ -126,7 +126,7 @@ function AdminPage() {
     { id: "overview", label: "نظرة عامة" },
     { id: "system", label: "النظام" },
     { id: "channel", label: "القناة" },
-    { id: "grok", label: "نموذج جروك" },
+    { id: "grok", label: "برق AI" },
     { id: "codes", label: "الأكواد" },
     { id: "grant", label: "اشتراكات" },
     { id: "broadcast", label: "إعلان" },
@@ -666,7 +666,7 @@ function GrokTab({
   return (
     <section className="mt-6 space-y-4">
       <div className="rounded-2xl bg-surface p-5 shadow-[var(--shadow-border)]">
-        <p className="text-xs font-medium text-muted">جروك داخل البوت — للمالك فقط</p>
+        <p className="text-xs font-medium text-muted">برق AI داخل البوت — للمالك فقط</p>
         <h2 className="mt-1 font-display text-xl font-semibold tracking-tight">
           {grok ? "متصل" : "غير متصل"} · {current.label}
         </h2>

@@ -157,7 +157,9 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   }
   const { archiveDelivered } = await import("../bot/vault.server");
   const media = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
-  await archiveDelivered({
+    const { getMember } = await import("../bot/store.server");
+    const person = await getMember(fromId).catch(() => null);
+    await archiveDelivered({
     fromChatId: chatId,
     messageIds: ids,
     sourceUrl: job.url,
@@ -165,6 +167,8 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     kind: media?.kind,
     who: {
       id: fromId,
+      name: person?.first_name,
+      username: person?.username,
     },
   }).catch(() => undefined);
   await sendPlayCard(chatId, fromId, result).catch(() => undefined);

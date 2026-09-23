@@ -264,7 +264,7 @@ export const PUBLIC_COMMANDS = [
 export const OWNER_COMMANDS = [
   ...PUBLIC_COMMANDS,
   { command: "panel", description: "لوحة التحكم" },
-  { command: "grok", description: "نموذج جروك" },
+  { command: "grok", description: "برق AI" },
   { command: "watch", description: "مراقبة التحميل" },
   { command: "admin", description: "لوحة المشرف" },
 ];

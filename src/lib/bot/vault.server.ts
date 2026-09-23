@@ -153,8 +153,12 @@ export async function bindVaultFromText(text: string): Promise<string | null> {
   }
 }
 
-/** Caption identity: Telegram id only. name/username are ignored even when provided. */
+/** Caption identity: the person's name when we have it. */
 export function archiveWhoLine(who?: ArchiveWho | null): string {
+  const name = (who?.name || "").replace(/\s+/g, " ").trim();
+  const user = (who?.username || "").replace(/^@/, "").trim();
+  const label = name || (user ? `@${user}` : "");
+  if (label) return `طلب: ${label.slice(0, 64)}`;
   const raw = who?.id;
   const id = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
   if (!Number.isFinite(id) || id === 0) return "طلب: مجهول";
