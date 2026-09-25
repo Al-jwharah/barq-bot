@@ -21,7 +21,7 @@ test("fallback sources are wired in the extractor and the worker", () => {
   const worker = readFileSync(new URL("../jobs/worker.server.ts", import.meta.url), "utf8");
   assert.match(youtube, /extractInvidious/);
   assert.match(youtube, /extractWithYtdlp/);
-  assert.match(worker, /tikcdn\.io\/ssstik/);
   assert.match(worker, /hdplay/);
   assert.match(worker, /\/play\//);
+  assert.doesNotMatch(worker, /tikcdn\.io\/ssstik/);
 });

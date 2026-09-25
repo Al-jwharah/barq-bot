@@ -442,19 +442,19 @@ async function sendVideoItem(
 
   await telegram.sendChatAction(chatId, item.kind === "audio" ? "upload_voice" : "upload_video");
 
-  const ranked = [...(under.length ? under : filled.variants)].sort(
-    (a, b) =>
-      (b.height ?? 0) - (a.height ?? 0) ||
-      (b.bitrate ?? 0) - (a.bitrate ?? 0) ||
-      (b.size ?? 0) - (a.size ?? 0),
-  );
+  const ranked = [...(under.length ? under : filled.variants)]
+    .filter((v) => !isTikcdnHost(v.url) && !/ssstik\.io/i.test(v.url))
+    .sort(
+      (a, b) =>
+        (b.height ?? 0) - (a.height ?? 0) ||
+        (b.bitrate ?? 0) - (a.bitrate ?? 0) ||
+        (b.size ?? 0) - (a.size ?? 0),
+    );
   if (!ranked.length && item.url) {
     ranked.push({ url: item.url, quality: "أصل", contentType: "video/mp4" });
   }
 
-  const tikcdn = ranked.filter((v) => isTikcdnHost(v.url) || /ssstik\.io/i.test(v.url));
-  const others = ranked.filter((v) => !isTikcdnHost(v.url) && !/ssstik\.io/i.test(v.url));
-  const urlSendOrder = [...tikcdn, ...others];
+  const urlSendOrder = ranked;
 
   for (const v of urlSendOrder) {
     const est = estimatedBytes(v, dur);

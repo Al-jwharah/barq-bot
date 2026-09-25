@@ -31,7 +31,6 @@ function forceTikTokFile(result: ExtractResult): ExtractResult {
   if (!video) return result;
   const hd = `https://www.tikwm.com/video/media/hdplay/${id}.mp4`;
   const play = `https://www.tikwm.com/video/media/play/${id}.mp4`;
-  const cdn = `https://tikcdn.io/ssstik/${id}`;
   return {
     ...result,
     items: [
@@ -42,7 +41,6 @@ function forceTikTokFile(result: ExtractResult): ExtractResult {
         variants: [
           { url: hd, quality: "HD", contentType: "video/mp4" },
           { url: play, quality: "أصل", contentType: "video/mp4" },
-          { url: cdn, quality: "بديل", contentType: "video/mp4" },
         ],
       },
     ],
@@ -131,7 +129,8 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   await editStatus(chatId, mid, progressStatus("extract"));
   await assertSafeMedia(job.url);
   const { cachedTelegramFile } = await import("../bot/file-cache.server");
-  const hit = await cachedTelegramFile(job.url).catch(() => null);
+  const tiktokJob = /tiktok\.com/i.test(job.url);
+  const hit = tiktokJob ? null : await cachedTelegramFile(job.url).catch(() => null);
   if (hit?.fileId) {
     await editStatus(chatId, mid, progressStatus("upload", "من الكاش"));
     await markJobUploading(job.id).catch(() => undefined);
