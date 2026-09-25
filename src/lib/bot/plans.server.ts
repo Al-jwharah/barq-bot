@@ -25,12 +25,15 @@ export function memberPlan(member: Member | null | undefined): SubPlan | undefin
   return planById(member.tier);
 }
 
-export function canUseYoutube(member: Member | null | undefined, fromId?: number): boolean {
-  if (!subscriptionsLive()) return true;
+/** Basic download is never a paid feature, including YouTube. */
+export function canUseYoutube(_member?: Member | null, _fromId?: number): boolean {
+  return true;
+}
+
+export function hasPremium(member: Member | null | undefined, fromId?: number): boolean {
   if (fromId != null && isOwnerId(fromId)) return true;
   if (member && isOwnerId(member.tg_id)) return true;
-  if (member && isSubscribed(member)) return true;
-  return false;
+  return Boolean(member && isSubscribed(member));
 }
 
 export function canUseAi(member: Member | null | undefined, fromId?: number): boolean {

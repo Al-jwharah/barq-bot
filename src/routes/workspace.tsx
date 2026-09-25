@@ -25,7 +25,7 @@ function WorkspacePage() {
       <Link to="/" className="text-sm underline">برق ⚡️</Link>
       <h1 className="mt-4 text-2xl font-semibold">مساحة العمل</h1>
       <p className="mt-3 text-sm leading-7 text-muted">
-        التحميل الأساسي يبقى مجانيًا. الحدود تحت مطبّقة في الخادم، وما نعرض ميزة بلا تنفيذ.
+        التحميل الأساسي مجاني للجميع. المشترك الساري يأخذ أولوية الطابور، خمس روابط في الرسالة، السجل، ورسائل AI أكثر. الدفع بالنجوم غير مفتوح للعامة.
       </p>
       <div className="mt-6 space-y-4">
         {tiers.map((tier) => {

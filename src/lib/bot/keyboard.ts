@@ -1,6 +1,6 @@
 import { GROK_KEYBOARD, OWNER_KEYBOARD } from "./owner-panel.server";
 import { inGrokMode } from "./session.server";
-import { getMember, type Member } from "./store.server";
+import { getMember, isSubscribed, type Member } from "./store.server";
 import { isOwnerId } from "./config.server";
 import { replyKeyboard } from "./telegram.server";
 
@@ -32,7 +32,8 @@ export const SUB_KEYBOARD = replyKeyboard([
 
 export const FREE_KEYBOARD = replyKeyboard([
   ["لخّصه وكابشن", "حسابي"],
-  ["الموقع", "كيف يعمل"],
+  ["ميزات المشترك", "كيف يعمل"],
+  ["الموقع"],
 ]);
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";
@@ -41,6 +42,7 @@ export function roleOf(fromId: number, member?: Member | null): UserRole {
   if (isOwnerId(fromId)) return "owner";
   const stored = (member?.role ?? (member?.is_admin ? "admin" : "")).toLowerCase();
   if (stored === "admin" || stored === "moderator" || stored === "support") return stored;
+  if (member && isSubscribed(member)) return "sub";
   return "free";
 }
 
@@ -57,5 +59,6 @@ export async function keysFor(fromId: number, member?: Member | null) {
     ]);
   }
   if (role === "support") return replyKeyboard([["/tickets", "كيف يعمل"]]);
+  if (role === "sub") return SUB_KEYBOARD;
   return FREE_KEYBOARD;
 }

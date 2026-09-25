@@ -40,14 +40,22 @@ export const Route = createFileRoute("/api/telegram")({
           return new Response(guarded.body, { status: guarded.status });
         }
         const msg = guarded.update.message;
-        const batch = msg ? [...new Set(urlsFromMessage(msg))].slice(0, 5) : [];
+        const fromId = msg ? (msg.from?.id ?? msg.chat.id) : 0;
+        let linkCap = 3;
+        if (msg) {
+          const { hasPremium } = await import("@/lib/bot/plans.server");
+          const { getMember } = await import("@/lib/bot/store.server");
+          const member = await getMember(fromId).catch(() => null);
+          if (hasPremium(member, fromId)) linkCap = 5;
+        }
+        const batch = msg ? [...new Set(urlsFromMessage(msg))].slice(0, linkCap) : [];
         if (msg && batch.length > 1) {
           const found = urlsFromMessage(msg).length;
           await telegram
             .sendMessage(
               msg.chat.id,
-              found > 5
-                ? `وصلت ${found} روابط. أجهّز أول 5، كل واحد لحاله.`
+              found > linkCap
+                ? `وصلت ${found} روابط. أجهّز أول ${linkCap}، كل واحد لحاله.`
                 : `وصلت ${batch.length} روابط. أجهّزها واحد واحد.`,
             )
             .catch(() => undefined);

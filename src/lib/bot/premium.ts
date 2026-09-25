@@ -23,7 +23,7 @@ const FREE: Entitlements = {
   monthlyCap: 60,
   priority: 0,
   maxFileMb: 50,
-  batchLinks: 1,
+  batchLinks: 3,
   library: false,
   workspace: false,
   agentTurns: 3,

@@ -191,9 +191,11 @@ function howText(free: number, channel: string, role: UserRole = "free"): string
 
 1. انسخ رابط المقطع من أي منصة
 2. الصقه هنا
-3. يصلك الملف بأعلى جودة
+3. يصلك الملف
 
-اكتب أي شيء لـ Barq AI: لخّص الفيديو، اشرح، حوّل فكرة.
+التحميل مجاني للجميع.
+المشترك الساري يأخذ أولوية الطابور، ٥ روابط معًا، السجل، ورسائل AI أكثر.
+
 تنبيه: المحتوى الإباحي و+18 قد يودي للحظر. نحن براء أمام الله من هذا المحتوى.
 
 التحديثات: @${channel || "barq_all"}
@@ -233,9 +235,11 @@ https://abdulrhman.ai
   }
   if (role === "sub") {
     return `${BOT_DISPLAY_NAME}
-اشتراكك ساري — التحميل بلا حدود ورابط مختصر لكل مقطع.
+اشتراكك ساري.
 
-انسخ الرابط والصقه هنا.`;
+التحميل مجاني للجميع. أنت زيادة: أولوية في الطابور، ٥ روابط معًا، السجل، ورسائل AI أكثر.
+
+الصق الرابط.`;
   }
   const join = channel
     ? `انضم إلى @${channel} ثم اضغط «تحقق من الانضمام» لتحصل على ${free} تحميلات مجانية.`
@@ -1659,14 +1663,6 @@ async function handleDownload(
       return;
     }
   }
-  {
-    const { canUseYoutube, youtubeLockedText, sendPlanCatalog, subscriptionsLive } = await import("./plans.server");
-    if (subscriptionsLive() && detectPlatform(url) === "youtube" && !canUseYoutube(member, fromId)) {
-      await telegram.sendMessage(chatId, youtubeLockedText());
-      await sendPlanCatalog(chatId, fromId);
-      return;
-    }
-  }
   if (quota.needJoin && quota.channel) {
     await sendJoinPrompt(chatId, quota.channel, quota.freeDownloads, fromId);
     return;
@@ -1770,7 +1766,7 @@ async function handleBarqChat(chatId: number, fromId: number, text: string) {
       await sendPlanCatalog(chatId, fromId);
       return;
     }
-    const q = await takeAiTurn(fromId);
+    const q = await takeAiTurn(fromId, (await import("./plans.server")).hasPremium(member, fromId) ? 40 : BARQ_AI_DAILY);
     if (!q.ok) {
       await telegram.sendMessage(
         chatId,
@@ -2403,7 +2399,26 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await handleAccount(chatId, fromId);
     return;
   }
+  if (text === "ميزات المشترك" || text.startsWith("/plus")) {
+    const { hasPremium } = await import("./plans.server");
+    const on = hasPremium(member, fromId);
+    await telegram.sendMessage(
+      chatId,
+      on
+        ? "اشتراكك ساري.\nالتحميل مجاني للجميع، وأنت زيادة: أولوية في الطابور، ٥ روابط في الرسالة، سجل التحميل، و٤٠ رسالة AI باليوم."
+        : "التحميل مجاني للجميع.\n\nزيادة المشترك الساري:\n• أولوية في الطابور\n• ٥ روابط في رسالة واحدة\n• سجل آخر التحميلات\n• رسائل برق AI أكثر\n\nالدفع بالنجوم جاهز وغير مفتوح للعامة. إذا فُعّل اشتراكك، المزايا تشتغل مباشرة.",
+      { reply_markup: await keysFor(fromId, member) },
+    );
+    return;
+  }
   if (text === "سجلي" || text === "سجليّ" || text.startsWith("/history") || text === "سجل التحميل") {
+    const { hasPremium } = await import("./plans.server");
+    if (!hasPremium(member, fromId)) {
+      await telegram.sendMessage(chatId, "السجل للمشترك الساري. التحميل يبقى مجانيًا — الصق الرابط.", {
+        reply_markup: await keysFor(fromId, member),
+      });
+      return;
+    }
     const { listHistory } = await import("./library.server");
     await sendHistoryList(chatId, fromId, await listHistory(fromId, 20), "آخر 20 تحميل");
     return;
