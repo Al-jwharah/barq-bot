@@ -14,6 +14,7 @@ type Tikwm = {
     hdplay?: string;
     wmplay?: string;
     duration?: number;
+    images?: string[];
     author?: { nickname?: string; unique_id?: string };
     music?: string;
     music_info?: { play?: string };

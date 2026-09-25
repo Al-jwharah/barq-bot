@@ -15,11 +15,9 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_NAME },
       { name: "theme-color", content: "#07070a" },
-      {
-        name: "description",
-        content:
-          "برق لتحميل فيديو تيك توك وإنستغرام ويوتيوب وإكس وفيسبوك بدون تطبيق. الصق الرابط في تليجرام ويصلك الملف. مجاني. abdulrhman.ai",
-      },
+      { name: "description", content: "برق لتحميل فيديو تيك توك وإنستغرام ويوتيوب وإكس وفيسبوك. الصق الرابط في تليجرام. التحميل الأساسي مجاني." },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:locale", content: "ar_SA" },
       ...(PUBLIC_ORIGIN
         ? [
             { property: "og:url", content: PUBLIC_ORIGIN },

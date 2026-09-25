@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { getStatus, resolveMedia } from "@/lib/media/functions";
 import type { ExtractResult, MediaItem } from "@/lib/media/types";
 import type { BotState } from "@/lib/bot/state";
+import { PlatformSections } from "@/components/platform-sections";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -35,7 +36,7 @@ const HISTORY_KEY = "barq-history";
 
 const FEATURES = [
   { title: "أي رابط", body: "يوتيوب، تيك توك، إنستغرام، إكس، فيسبوك أو ملف مباشر — الصق وانتهى." },
-  { title: "Barq AI", body: "اكتب لخّص الفيديو، اشرح، حوّل فكرة. يفهم الشات ويرد مباشرة." },
+  { title: "Barq AI", body: "يفحص الرابط ويبدأ التحميل بعد التأكيد، ويتابع رقم المهمة. ما يقول تم إلا إذا رجع الطابور نجاحًا." },
   { title: "مجاني", body: "التحميل مجاني. الحساب يفتح من زر تحت كل مقطع." },
 ];
 
@@ -285,6 +286,7 @@ function Home() {
           </article>
         ))}
       </section>
+      <PlatformSections />
 
       <nav className="mt-6 flex flex-wrap gap-2 text-xs">
         {[

@@ -22,6 +22,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SnapchatRouteImport } from './routes/snapchat'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TiktokRouteImport } from './routes/tiktok'
+import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as XRouteImport } from './routes/x'
 import { Route as YoutubeRouteImport } from './routes/youtube'
 import { Route as ApiBackupRouteImport } from './routes/api/backup'
@@ -38,6 +39,7 @@ import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
 import { Route as DIdRouteImport } from './routes/d.$id'
 import { Route as DlIdRouteImport } from './routes/dl.$id'
 import { Route as SIdRouteImport } from './routes/s.$id'
+import { Route as ApiPaypalWebhookRouteImport } from './routes/api/paypal/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -102,6 +104,11 @@ const TermsRoute = TermsRouteImport.update({
 const TiktokRoute = TiktokRouteImport.update({
   id: '/tiktok',
   path: '/tiktok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkspaceRoute = WorkspaceRouteImport.update({
+  id: '/workspace',
+  path: '/workspace',
   getParentRoute: () => rootRouteImport,
 } as any)
 const XRoute = XRouteImport.update({
@@ -184,6 +191,11 @@ const SIdRoute = SIdRouteImport.update({
   path: '/s/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPaypalWebhookRoute = ApiPaypalWebhookRouteImport.update({
+  id: '/api/paypal/webhook',
+  path: '/api/paypal/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -199,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/snapchat': typeof SnapchatRoute
   '/terms': typeof TermsRoute
   '/tiktok': typeof TiktokRoute
+  '/workspace': typeof WorkspaceRoute
   '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
   '/api/backup': typeof ApiBackupRoute
@@ -215,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/d/$id': typeof DIdRoute
   '/dl/$id': typeof DlIdRoute
   '/s/$id': typeof SIdRoute
+  '/api/paypal/webhook': typeof ApiPaypalWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -230,6 +244,7 @@ export interface FileRoutesByTo {
   '/snapchat': typeof SnapchatRoute
   '/terms': typeof TermsRoute
   '/tiktok': typeof TiktokRoute
+  '/workspace': typeof WorkspaceRoute
   '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
   '/api/backup': typeof ApiBackupRoute
@@ -246,6 +261,7 @@ export interface FileRoutesByTo {
   '/d/$id': typeof DIdRoute
   '/dl/$id': typeof DlIdRoute
   '/s/$id': typeof SIdRoute
+  '/api/paypal/webhook': typeof ApiPaypalWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -262,6 +278,7 @@ export interface FileRoutesById {
   '/snapchat': typeof SnapchatRoute
   '/terms': typeof TermsRoute
   '/tiktok': typeof TiktokRoute
+  '/workspace': typeof WorkspaceRoute
   '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
   '/api/backup': typeof ApiBackupRoute
@@ -278,6 +295,7 @@ export interface FileRoutesById {
   '/d/$id': typeof DIdRoute
   '/dl/$id': typeof DlIdRoute
   '/s/$id': typeof SIdRoute
+  '/api/paypal/webhook': typeof ApiPaypalWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -295,6 +313,7 @@ export interface FileRouteTypes {
     | '/snapchat'
     | '/terms'
     | '/tiktok'
+    | '/workspace'
     | '/x'
     | '/youtube'
     | '/api/backup'
@@ -311,6 +330,7 @@ export interface FileRouteTypes {
     | '/d/$id'
     | '/dl/$id'
     | '/s/$id'
+    | '/api/paypal/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -326,6 +346,7 @@ export interface FileRouteTypes {
     | '/snapchat'
     | '/terms'
     | '/tiktok'
+    | '/workspace'
     | '/x'
     | '/youtube'
     | '/api/backup'
@@ -342,6 +363,7 @@ export interface FileRouteTypes {
     | '/d/$id'
     | '/dl/$id'
     | '/s/$id'
+    | '/api/paypal/webhook'
   id:
     | '__root__'
     | '/'
@@ -357,6 +379,7 @@ export interface FileRouteTypes {
     | '/snapchat'
     | '/terms'
     | '/tiktok'
+    | '/workspace'
     | '/x'
     | '/youtube'
     | '/api/backup'
@@ -373,6 +396,7 @@ export interface FileRouteTypes {
     | '/d/$id'
     | '/dl/$id'
     | '/s/$id'
+    | '/api/paypal/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -389,6 +413,7 @@ export interface RootRouteChildren {
   SnapchatRoute: typeof SnapchatRoute
   TermsRoute: typeof TermsRoute
   TiktokRoute: typeof TiktokRoute
+  WorkspaceRoute: typeof WorkspaceRoute
   XRoute: typeof XRoute
   YoutubeRoute: typeof YoutubeRoute
   ApiBackupRoute: typeof ApiBackupRoute
@@ -405,6 +430,7 @@ export interface RootRouteChildren {
   DIdRoute: typeof DIdRoute
   DlIdRoute: typeof DlIdRoute
   SIdRoute: typeof SIdRoute
+  ApiPaypalWebhookRoute: typeof ApiPaypalWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -498,6 +524,13 @@ declare module '@tanstack/react-router' {
       path: '/tiktok'
       fullPath: '/tiktok'
       preLoaderRoute: typeof TiktokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workspace': {
+      id: '/workspace'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof WorkspaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/x': {
@@ -612,6 +645,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/paypal/webhook': {
+      id: '/api/paypal/webhook'
+      path: '/api/paypal/webhook'
+      fullPath: '/api/paypal/webhook'
+      preLoaderRoute: typeof ApiPaypalWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -629,6 +669,7 @@ const rootRouteChildren: RootRouteChildren = {
   SnapchatRoute: SnapchatRoute,
   TermsRoute: TermsRoute,
   TiktokRoute: TiktokRoute,
+  WorkspaceRoute: WorkspaceRoute,
   XRoute: XRoute,
   YoutubeRoute: YoutubeRoute,
   ApiBackupRoute: ApiBackupRoute,
@@ -645,6 +686,7 @@ const rootRouteChildren: RootRouteChildren = {
   DIdRoute: DIdRoute,
   DlIdRoute: DlIdRoute,
   SIdRoute: SIdRoute,
+  ApiPaypalWebhookRoute: ApiPaypalWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

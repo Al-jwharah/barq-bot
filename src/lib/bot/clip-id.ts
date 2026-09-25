@@ -1,10 +1,9 @@
-import { randomBytes } from "node:crypto";
-
 export const CLIP_ID_BYTES = 32;
 export const CLIP_TTL_MS = 24 * 60 * 60 * 1000;
 
-export function generateClipId(): string {
-  return randomBytes(CLIP_ID_BYTES).toString("base64url");
+function base64urlBytes(raw: string): number {
+  const rem = raw.length % 4;
+  return Math.floor(raw.length / 4) * 3 + (rem === 0 ? 0 : rem - 1);
 }
 
 export function isClipId(raw: string): boolean {
@@ -14,11 +13,7 @@ export function isClipId(raw: string): boolean {
   }
   if (!/^[A-Za-z0-9_-]{43,64}$/.test(raw)) return false;
   if (/^\d+$/.test(raw)) return false;
-  try {
-    return Buffer.from(raw, "base64url").length >= CLIP_ID_BYTES;
-  } catch {
-    return false;
-  }
+  return base64urlBytes(raw) >= CLIP_ID_BYTES;
 }
 
 export type ClipAccess = {

@@ -1,4 +1,4 @@
-import { getPublicOrigin, publicUrl, shouldCanonicalRedirect } from "../../src/lib/bot/origin";
+import { getPublicOrigin, shouldCanonicalRedirect } from "../../src/lib/bot/origin";
 
 interface OriginEvent {
   url: URL;
@@ -14,15 +14,16 @@ export default async function canonicalOriginMiddleware(
   const origin = getPublicOrigin();
 
   if ((method === "GET" || method === "HEAD") && path === "/robots.txt") {
-    return new Response("User-agent: *\nAllow: /\nSitemap: https://abdulrhman.ai/sitemap.xml\n", {
+    const line = origin ? `Sitemap: ${origin}/sitemap.xml\n` : "";
+    return new Response(`User-agent: *\nAllow: /\n${line}`, {
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
 
   if ((method === "GET" || method === "HEAD") && path === "/sitemap.xml") {
     if (!origin) return new Response("BARQ_PUBLIC_ORIGIN missing", { status: 503 });
-    const pages = ["/", "/tiktok", "/instagram", "/youtube", "/x", "/facebook", "/snapchat", "/faq", "/legal"];
-    const urls = pages.map((p) => `https://abdulrhman.ai${p === "/" ? "" : p}`);
+    const pages = ["/", "/tiktok", "/instagram", "/youtube", "/x", "/facebook", "/snapchat", "/faq", "/legal", "/privacy", "/terms", "/account", "/workspace"];
+    const urls = pages.map((p) => `${origin}${p === "/" ? "" : p}`);
     const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map((loc) => `  <url><loc>${loc}</loc></url>`).join("\n")}

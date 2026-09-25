@@ -27,11 +27,11 @@ function authSchemaCopy(root) {
   return { copy: readFileSync(copy, "utf8"), source: readFileSync(source, "utf8") };
 }
 
-/** Top-level product SQL: 0002–0021. Auth is not included. */
+/** Top-level product SQL from 0002 upward. Auth is not included. */
 function productMigrationNames(entries) {
   return entries
     .filter((name) => isMigrationFile(name))
-    .filter((name) => /^00(0[2-9]|1\d|2[01])_.*\.sql$/.test(name))
+    .filter((name) => /^00\d{2}_.+\.sql$/.test(name) && !name.startsWith("0001_"))
     .sort((a, b) => a.localeCompare(b));
 }
 

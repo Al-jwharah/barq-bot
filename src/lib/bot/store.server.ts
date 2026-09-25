@@ -3,7 +3,8 @@ import { BARQ_AI_DAILY, FREE_DOWNLOADS, isOwnerId, OWNER_TG_ID, SUB_DAYS } from 
 import { verifyPin } from "./admin-session.server";
 import { consumePromo, findPromo, putPromo } from "./promo-blob.server";
 import { findClipBlob, putClipBlob } from "./clip-blob.server";
-import { generateClipId, isClipId } from "./clip-id";
+import { generateClipId } from "./clip-id.server";
+import { isClipId } from "./clip-id";
 
 export function normalizePromoInput(raw: string): string {
   const u = raw.trim().toUpperCase();

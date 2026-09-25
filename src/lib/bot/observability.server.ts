@@ -47,6 +47,7 @@ export async function logJson(input: {
 
 export function friendlyError(err: unknown): string {
   const raw = err instanceof Error ? err.message.split("\n")[0]! : "تعذر إكمال الطلب";
+  if (/429|too many/i.test(raw)) return "طلبات كثيرة. انتظر قليلًا ثم أعد المحاولة.";
   return userFailMessage(redactSecrets(raw));
 }
 

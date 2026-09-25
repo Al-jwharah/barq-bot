@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { generateClipId } from "./clip-id.server.ts";
 import {
   CLIP_TTL_MS,
   clipDeniedReason,
   clipExpiresAt,
   clipServeStatus,
-  generateClipId,
   isClipId,
   toPublicClip,
 } from "./clip-id.ts";

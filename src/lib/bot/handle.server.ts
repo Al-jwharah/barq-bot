@@ -1843,6 +1843,12 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     if (payload.startsWith("sub:")) {
       const { planFromPayment } = await import("./plans.server");
       const plan = planFromPayment(payload, pay.total_amount);
+      if (!plan) {
+        await telegram.sendMessage(chatId, "مبلغ النجوم لا يطابق الخطة. ما تم تفعيل اشتراك.", {
+          reply_markup: await keysFor(fromId),
+        });
+        return;
+      }
       const paid = await recordPayment(fromId, pay.total_amount, pay.telegram_payment_charge_id, true, plan.id);
       if (paid.duplicate) {
         await telegram.sendMessage(chatId, "هذه الدفعة مسجّلة مسبقًا.", {

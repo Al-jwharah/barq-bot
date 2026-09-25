@@ -12,6 +12,7 @@ import {
   type PlanId,
   type SubPlan,
 } from "./plans";
+import { starsMatchPlan } from "./payment-validation";
 import { isSubscribed, type Member } from "./store.server";
 
 /** Public charging stays off until both flags say go. */
@@ -67,11 +68,9 @@ function SUB_PLAN(id: PlanId): SubPlan {
   return planById(id) ?? PLUS_PLAN;
 }
 
-export function planFromPayment(payload: string, stars: number): SubPlan {
-  const id = parseSubPayload(payload);
-  if (id) return SUB_PLAN(id);
-  if (stars >= MAX_PLAN.stars) return MAX_PLAN;
-  return PLUS_PLAN;
+/** Exact Stars amount for the payload plan. A mismatch does not grant a different plan. */
+export function planFromPayment(payload: string, stars: number): SubPlan | null {
+  return starsMatchPlan(payload, stars);
 }
 
 export function youtubeLockedText(): string {
