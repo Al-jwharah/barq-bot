@@ -194,7 +194,9 @@ export async function extractMedia(input: string): Promise<ExtractResult> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "فشل";
     errors.push(msg);
-    if (/ما قدرت|تعذر |هذا مو |هذا رابط|غير مدعوم/.test(msg)) throw err instanceof Error ? err : new Error(msg);
+    if (platform === "suno" || /ما قدرت|تعذر |هذا مو |هذا رابط|غير مدعوم|المختصر/.test(msg)) {
+      throw err instanceof Error ? err : new Error(msg);
+    }
   }
 
   if (platform !== "generic") {

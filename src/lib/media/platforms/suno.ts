@@ -1,32 +1,29 @@
-import { fetchText, mediaHeaders } from "../http";
-import type { ExtractResult, MediaItem } from "../types";
+import { mediaHeaders } from "../http";
+import type { ExtractResult } from "../types";
 
-const SONG_ID =
-  /\/(?:song|embed|s)\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const SONG_ID = new RegExp(`/(?:song|embed)/(${UUID})`, "i");
+const SHARE_CODE = /\/s\/([A-Za-z0-9_-]{6,32})\/?$/i;
 
 export function sunoSongId(url: string): string | null {
   const match = url.match(SONG_ID);
   return match?.[1]?.toLowerCase() ?? null;
 }
 
-function meta(html: string, prop: string): string | undefined {
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`,
-    "i",
-  );
-  const m = html.match(re);
-  const value = m?.[1] || m?.[2];
-  return value ? value.split("&").join("&") : undefined;
-}
-
-function abs(raw: string, base: string): string | null {
+export function sunoShareCode(url: string): string | null {
   try {
-    const u = new URL(raw, base);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-    return u.toString();
+    const path = new URL(url).pathname;
+    const match = path.match(SHARE_CODE);
+    return match?.[1] ?? null;
   } catch {
     return null;
   }
+}
+
+function browserToken(): string {
+  return JSON.stringify({
+    token: Buffer.from(JSON.stringify({ timestamp: Date.now() })).toString("base64"),
+  });
 }
 
 async function playable(url: string): Promise<boolean> {
@@ -44,68 +41,111 @@ async function playable(url: string): Promise<boolean> {
   }
 }
 
-export async function extractSuno(url: string): Promise<ExtractResult> {
-  const id = sunoSongId(url);
-  if (!id) throw new Error("أرسل رابط الأغنية من Suno، مثل suno.com/song/…");
+function pickId(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Record<string, unknown>;
+  for (const key of ["content_id", "clip_id", "song_id", "id"]) {
+    const id = row[key];
+    if (typeof id === "string" && new RegExp(`^${UUID}$`, "i").test(id)) return id.toLowerCase();
+  }
+  for (const nested of [row.content, row.clip, row.song, row.data]) {
+    const id = pickId(nested);
+    if (id) return id;
+  }
+  const link = row.link || row.url || row.canonical_url;
+  if (typeof link === "string") return sunoSongId(link);
+  return null;
+}
 
-  let html = "";
-  let finalUrl = url;
+async function resolveShare(code: string): Promise<string | null> {
   try {
-    const page = await fetchText(url, undefined, 12000);
-    html = page.text;
-    finalUrl = page.finalUrl || url;
+    const res = await fetch(`https://studio-api-prod.suno.com/api/share/code/${encodeURIComponent(code)}`, {
+      headers: mediaHeaders(
+        {
+          Accept: "application/json",
+          Origin: "https://suno.com",
+          Referer: `https://suno.com/s/${code}`,
+          "Browser-Token": browserToken(),
+        },
+        "https://suno.com/",
+      ),
+    });
+    if (!res.ok) return null;
+    return pickId(await res.json());
   } catch {
-    html = "";
+    return null;
+  }
+}
+
+type Clip = {
+  id?: string;
+  title?: string;
+  video_url?: string;
+  audio_url?: string;
+  image_large_url?: string;
+  image_url?: string;
+  status?: string;
+};
+
+async function loadClip(id: string): Promise<Clip | null> {
+  try {
+    const res = await fetch(`https://studio-api-prod.suno.com/api/clip/${id}`, {
+      headers: mediaHeaders(
+        { Accept: "application/json", Origin: "https://suno.com", Referer: "https://suno.com/" },
+        "https://suno.com/",
+      ),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Clip;
+    return data?.id ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function extractSuno(url: string): Promise<ExtractResult> {
+  let id = sunoSongId(url);
+  if (!id) {
+    const code = sunoShareCode(url);
+    if (code) id = await resolveShare(code);
+  }
+  if (!id) {
+    throw new Error("رابط Suno المختصر ما فتح الأغنية. افتحها وانسخ الرابط الذي فيه /song/.");
   }
 
-  const found = html.match(/https?:\/\/[^"'\\\s>]+\.(?:mp4|m4a|mp3)(?:\?[^"'\\\s>]*)?/gi) ?? [];
-  const videos: string[] = [];
-  const audios: string[] = [];
-  const push = (raw: string | null | undefined, list: string[]) => {
-    if (!raw || list.includes(raw)) return;
-    if (/sil-100\.mp3|favicon|image_/i.test(raw)) return;
-    list.push(raw);
-  };
-  push(`https://cdn1.suno.ai/${id}.mp4`, videos);
-  for (const raw of found) {
-    const u = abs(raw, finalUrl);
-    if (!u || !u.toLowerCase().includes(id)) continue;
-    if (/\.mp4(?:\?|$)/i.test(u)) push(u, videos);
-    else push(u, audios);
-  }
-  push(`https://cdn1.suno.ai/${id}.mp3`, audios);
+  const clip = await loadClip(id);
+  const title = clip?.title;
+  const cover = clip?.image_large_url || clip?.image_url;
+  const candidates = [
+    clip?.video_url,
+    `https://cdn1.suno.ai/${id}.mp4`,
+  ].filter((u): u is string => typeof u === "string" && !/\/api\/forbidden/i.test(u));
 
-  const title = html ? meta(html, "og:title")?.replace(/\s*\|\s*Suno\s*$/i, "") : undefined;
-  const cover = html
-    ? [`https://cdn2.suno.ai/image_large_${id}.jpeg`, meta(html, "og:image")].find(
-        (u) => u && !/favicon/i.test(u),
-      )
-    : `https://cdn2.suno.ai/image_large_${id}.jpeg`;
-
-  for (const video of videos) {
+  for (const video of candidates) {
     if (!(await playable(video))) continue;
-    const item: MediaItem = {
-      kind: "video",
-      url: video,
-      thumbnail: cover,
-      variants: [{ url: video, quality: "فيديو", contentType: "video/mp4" }],
-    };
     return {
       platform: "suno",
       id,
       title,
-      sourceUrl: finalUrl,
-      items: [item],
+      sourceUrl: `https://suno.com/song/${id}`,
+      items: [
+        {
+          kind: "video",
+          url: video,
+          thumbnail: cover,
+          variants: [{ url: video, quality: "فيديو", contentType: "video/mp4" }],
+        },
+      ],
     };
   }
 
-  for (const audio of audios) {
-    if (!(await playable(audio))) continue;
+  const audio = clip?.audio_url;
+  if (audio && !/\/api\/forbidden/i.test(audio) && (await playable(audio))) {
     return {
       platform: "suno",
       id,
       title,
-      sourceUrl: finalUrl,
+      sourceUrl: `https://suno.com/song/${id}`,
       items: [
         {
           kind: "audio",
@@ -117,5 +157,5 @@ export async function extractSuno(url: string): Promise<ExtractResult> {
     };
   }
 
-  throw new Error("ما لقيت فيديو الأغنية على Suno. أعد إرسال رابط song.");
+  throw new Error("ما لقيت فيديو هذه الأغنية على Suno.");
 }

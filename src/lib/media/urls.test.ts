@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isHostedMediaCdn } from "./http.ts";
+import { sunoShareCode, sunoSongId } from "./platforms/suno.ts";
 import { detectPlatform, supportedDownloadPlatform, tweetIdFromUrl, youtubeIdFromUrl, youtubePlaylistIdFromUrl } from "./urls.ts";
 
 test("supports any video link including facebook reddit and generic", () => {
@@ -19,6 +20,9 @@ test("supports any video link including facebook reddit and generic", () => {
   assert.equal(detectPlatform("https://clips.twitch.tv/ClipName"), "twitch");
   assert.equal(detectPlatform("https://www.twitch.tv/user/clip/abc"), "twitch");
   assert.equal(detectPlatform("https://suno.com/song/c7da8bf4-816c-4341-ad6f-e58e228f5e63"), "suno");
+  assert.equal(sunoSongId("https://suno.com/song/c7da8bf4-816c-4341-ad6f-e58e228f5e63"), "c7da8bf4-816c-4341-ad6f-e58e228f5e63");
+  assert.equal(sunoShareCode("https://suno.com/s/YvxiXiH4ss2J0ADI"), "YvxiXiH4ss2J0ADI");
+  assert.equal(sunoSongId("https://suno.com/s/YvxiXiH4ss2J0ADI"), null);
   assert.equal(youtubePlaylistIdFromUrl("https://www.youtube.com/playlist?list=PLabcdefghijklmnopqrstuv"), "PLabcdefghijklmnopqrstuv");
   assert.equal(youtubePlaylistIdFromUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLabcdefghijklmnopqrstuv"), "PLabcdefghijklmnopqrstuv");
 });
