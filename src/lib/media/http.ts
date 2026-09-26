@@ -23,6 +23,8 @@ export function mediaHeaders(extra?: HeadersInit, forUrl?: string): Headers {
         h.set("Referer", "https://www.instagram.com/");
       } else if (host.includes("tikwm")) {
         h.set("Referer", "https://www.tikwm.com/");
+      } else if (host.includes("suno")) {
+        h.set("Referer", "https://suno.com/");
       } else if (host.includes("tiktok") || host.includes("muscdn") || host.includes("byteicdn")) {
         h.set("Referer", "https://www.tiktok.com/");
       } else if (host.includes("googlevideo") || host.includes("youtube") || host.includes("ytimg") || host.includes("ggpht")) {

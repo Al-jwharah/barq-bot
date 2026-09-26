@@ -28,6 +28,7 @@ export type Platform =
   | "vimeo"
   | "pinterest"
   | "twitch"
+  | "suno"
   | "generic";
 
 export const DOWNLOAD_PLATFORMS = ["tiktok", "instagram", "x", "youtube"] as const;
@@ -58,13 +59,11 @@ export function detectPlatform(url: string): Platform {
   ) {
     return "pinterest";
   }
-  if (
-    host === "twitch.tv" ||
-    host.endsWith(".twitch.tv") ||
-    host === "clips.twitch.tv" ||
-    host.endsWith("twitch.tv")
-  ) {
+  if (host === "twitch.tv" || host.endsWith(".twitch.tv") || host === "clips.twitch.tv") {
     return "twitch";
+  }
+  if (host === "suno.com" || host.endsWith(".suno.com") || host === "suno.ai" || host.endsWith(".suno.ai")) {
+    return "suno";
   }
   if (
     host === "fb.watch" ||

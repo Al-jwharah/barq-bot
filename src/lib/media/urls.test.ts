@@ -18,7 +18,7 @@ test("supports any video link including facebook reddit and generic", () => {
   assert.equal(detectPlatform("https://pin.it/abc"), "pinterest");
   assert.equal(detectPlatform("https://clips.twitch.tv/ClipName"), "twitch");
   assert.equal(detectPlatform("https://www.twitch.tv/user/clip/abc"), "twitch");
-  assert.equal(detectPlatform("https://ads.tiktok.com/business/creative/1"), "tiktok");
+  assert.equal(detectPlatform("https://suno.com/song/c7da8bf4-816c-4341-ad6f-e58e228f5e63"), "suno");
   assert.equal(youtubePlaylistIdFromUrl("https://www.youtube.com/playlist?list=PLabcdefghijklmnopqrstuv"), "PLabcdefghijklmnopqrstuv");
   assert.equal(youtubePlaylistIdFromUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLabcdefghijklmnopqrstuv"), "PLabcdefghijklmnopqrstuv");
 });

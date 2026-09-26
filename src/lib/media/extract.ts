@@ -3,6 +3,7 @@ import { extractGeneric } from "./platforms/generic";
 import { extractInstagram } from "./platforms/instagram";
 import { extractPinterest } from "./platforms/pinterest";
 import { extractReddit } from "./platforms/reddit";
+import { extractSuno } from "./platforms/suno";
 import { extractTikTok } from "./platforms/tiktok";
 import { extractTwitch } from "./platforms/twitch";
 import { extractVimeo } from "./platforms/vimeo";
@@ -118,6 +119,8 @@ async function extractForPlatform(url: string, platform: string): Promise<Extrac
       return extractPinterest(url);
     case "twitch":
       return extractTwitch(url);
+    case "suno":
+      return extractSuno(url);
     default:
       return extractGeneric(url);
   }
