@@ -55,7 +55,7 @@ export function userFailMessage(raw: string): string {
   if (/timeout|timed out|etimedout|download_timeout|aborted/.test(s)) return "انتهت مهلة المصدر. حاول لاحقًا.";
   if (/download_failed_spawn/.test(s)) return "تعذر إرسال الملف. أعد المحاولة.";
   if (/enoent|ffmpeg|libmp3lame|spawn/.test(s)) {
-    return "تحويل الصوت غير متاح على السيرفر. أعد إرسال الرابط ويصلك المقطع كامل.";
+    return "تعذر تحويل المقطع الآن. أعد المحاولة بعد دقيقة.";
   }
   if (/(?:^|\s)429\b|rate limit/.test(s) && !/redirect/.test(s)) {
     return "تعذر التحميل من المصدر. أعد إرسال الرابط.";
