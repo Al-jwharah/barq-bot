@@ -84,9 +84,9 @@ export async function audioWithCoverToMp4(
     if (cover && cover.length > 32) {
       const image = join(dir, "cover.jpg");
       await writeFile(image, cover);
-      args.push("-loop", "1", "-framerate", "1", "-i", image);
+      args.push("-loop", "1", "-framerate", "25", "-i", image);
     } else {
-      args.push("-f", "lavfi", "-i", "color=c=0x111111:s=720x720:r=1");
+      args.push("-f", "lavfi", "-i", "color=c=0x111111:s=720x720:r=25");
     }
     args.push(
       "-i",
@@ -101,12 +101,22 @@ export async function audioWithCoverToMp4(
       "stillimage",
       "-preset",
       "veryfast",
+      "-crf",
+      "28",
       "-pix_fmt",
       "yuv420p",
+      "-r",
+      "25",
       "-vf",
-      "scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2",
+      "scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
       "-c:a",
       "aac",
+      "-profile:a",
+      "aac_low",
+      "-ar",
+      "44100",
+      "-ac",
+      "2",
       "-b:a",
       "160k",
       "-shortest",
