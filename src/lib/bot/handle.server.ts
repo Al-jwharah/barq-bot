@@ -558,6 +558,37 @@ async function sendPhotoItem(
   return null;
 }
 
+async function sendSunoVideo(chatId: number, result: ExtractResult, item: MediaItem): Promise<number | null> {
+  const audio = await downloadBlob(item.url);
+  let bytes: Buffer = Buffer.from(await audio.arrayBuffer());
+  if (result.id && bytes.subarray(4, 8).toString() !== "ftyp") {
+    const { decryptSunoMedia } = await import("../media/suno-drm.server");
+    bytes = Buffer.from(await decryptSunoMedia(bytes, result.id));
+  }
+  let cover: Buffer | null = null;
+  if (item.thumbnail) {
+    try {
+      const shot = await downloadBlob(item.thumbnail, 4_000_000);
+      cover = Buffer.from(await shot.arrayBuffer());
+    } catch {
+      cover = null;
+    }
+  }
+  const { audioWithCoverToMp4 } = await import("../media/convert.server");
+  const mp4 = await audioWithCoverToMp4(bytes, cover);
+  const cap = signatureCaption("video", result.platform, result.sourceUrl);
+  const markup = await clipMarkup(chatId, result.sourceUrl);
+  const fileExtra: Record<string, string> = { reply_markup: JSON.stringify(markup) };
+  if (cap) fileExtra.caption = cap;
+  const title = (result.title || "barq").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim() || "barq";
+  const uploaded = await sendVideoFile(chatId, mp4, `${title}.mp4`, fileExtra);
+  if (uploaded?.file_id) {
+    const { saveTelegramFile } = await import("./file-cache.server");
+    await saveTelegramFile(result.sourceUrl, uploaded.file_id, "video").catch(() => undefined);
+  }
+  return uploaded?.message_id ?? null;
+}
+
 export async function deliver(chatId: number, result: ExtractResult, stamp = false, fromId?: number): Promise<number[]> {
   if (prefersWebsite(result)) {
     const hosted = await sendHostedMedia(chatId, fromId ?? chatId, result);
@@ -577,9 +608,11 @@ export async function deliver(chatId: number, result: ExtractResult, stamp = fal
   for (const item of preferred) {
     try {
       const mid =
-        item.kind === "photo"
-          ? await sendPhotoItem(chatId, result, item, first, stamp)
-          : await sendVideoItem(chatId, result, item, first, stamp);
+        result.platform === "suno" && item.kind === "audio"
+          ? await sendSunoVideo(chatId, result, item)
+          : item.kind === "photo"
+            ? await sendPhotoItem(chatId, result, item, first, stamp)
+            : await sendVideoItem(chatId, result, item, first, stamp);
       if (mid) ids.push(mid);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";

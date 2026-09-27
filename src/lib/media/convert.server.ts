@@ -1,13 +1,26 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const FFMPEG = process.env.FFMPEG_PATH?.trim() || "/usr/local/bin/ffmpeg";
 
+function ffmpegBin(): string {
+  if (existsSync(FFMPEG)) return FFMPEG;
+  try {
+    const bundled = createRequire(import.meta.url)("ffmpeg-static") as string | null;
+    if (bundled && existsSync(bundled)) return bundled;
+  } catch {
+    /* package missing */
+  }
+  return "ffmpeg";
+}
+
 function run(args: string[], timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(FFMPEG, args, { stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(ffmpegBin(), args, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
@@ -36,6 +49,54 @@ async function withTemp<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+export async function audioWithCoverToMp4(
+  audio: Buffer,
+  cover: Buffer | null,
+  timeoutMs = 90000,
+): Promise<Blob> {
+  return withTemp(async (dir) => {
+    const sound = join(dir, "audio.bin");
+    const output = join(dir, "out.mp4");
+    await writeFile(sound, audio);
+    const args = ["-y"];
+    if (cover && cover.length > 32) {
+      const image = join(dir, "cover.jpg");
+      await writeFile(image, cover);
+      args.push("-loop", "1", "-framerate", "1", "-i", image);
+    } else {
+      args.push("-f", "lavfi", "-i", "color=c=0x111111:s=720x720:r=1");
+    }
+    args.push(
+      "-i",
+      sound,
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-c:v",
+      "libx264",
+      "-tune",
+      "stillimage",
+      "-preset",
+      "veryfast",
+      "-pix_fmt",
+      "yuv420p",
+      "-vf",
+      "scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "160k",
+      "-shortest",
+      "-movflags",
+      "+faststart",
+      output,
+    );
+    await run(args, timeoutMs);
+    return new Blob([await readFile(output)], { type: "video/mp4" });
+  });
 }
 
 export async function blobToMp3(blob: Blob, timeoutMs = 45000): Promise<Blob> {
