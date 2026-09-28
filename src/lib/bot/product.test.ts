@@ -15,10 +15,12 @@ import {
 import { userFailMessage } from "../jobs/retry-policy.ts";
 import { PRO_PLAN, SEASON_PLAN, starsForSar } from "./plans.ts";
 
-test("progress stages increase", () => {
-  assert.equal(stageProgress("safe").pct, 15);
-  assert.equal(stageProgress("done").pct, 100);
-  assert.match(progressStatus("extract"), /%/);
+test("progress stages have no invented percent", () => {
+  assert.equal(stageProgress("extract").label, "أفحص الرابط");
+  assert.equal(stageProgress("preview").label, "أحمّل الملف");
+  assert.equal(stageProgress("upload").label, "أجهّزه لتيليجرام");
+  assert.equal(stageProgress("done").label, "تم");
+  assert.doesNotMatch(progressStatus("extract"), /%/);
 });
 
 test("live streams and gone/copyright copy", () => {

@@ -7,7 +7,7 @@ describe("clipCaption", () => {
     const a = clipCaption("barq_ibot", "video", "tiktok", "https://vt.tiktok.com/x", 0);
     const b = clipCaption("barq_ibot", "video", "tiktok", "https://vt.tiktok.com/x", 1);
     assert.match(a, /@barq_ibot/);
-    assert.match(a, /abdulrhman\.ai/);
+    assert.doesNotMatch(a, /abdulrhman\.ai/);
     assert.equal(a, b);
     assert.equal(CLIP_LINES.length, 1);
     assert.equal(CLIP_LINES.some((s) => /كنتاكي|😂/.test(s)), false);

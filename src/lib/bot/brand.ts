@@ -1,4 +1,4 @@
-import { BOT_USERNAME, SIGNATURE, SUPPORT_URL } from "./config.server";
+import { BOT_USERNAME, SIGNATURE } from "./config.server";
 
 export const RELIGIOUS_DISCLAIMER = "إن الله يراك. فاتقوا الله فيما تشاهدون.";
 
@@ -25,6 +25,8 @@ export function platformLabelAr(platform?: string | null): string {
       return "تويتش";
     case "vimeo":
       return "فيميو";
+    case "suno":
+      return "سونو";
     case "direct":
       return "ملف مباشر";
     case "generic":
@@ -45,35 +47,25 @@ export function clipCaption(
 ): string {
   const handle = (username || BOT_USERNAME).replace(/^@/, "").trim() || BOT_USERNAME;
   return `برق ⚡️
-abdulrhman.ai
 @${handle}`;
 }
 
 export function clipActionRows(
-  accountUrl?: string,
+  _accountUrl?: string,
   sourceUrl?: string,
+  kind: "video" | "photo" | "gif" | "audio" = "video",
 ): { text: string; url?: string; callback_data?: string }[][] {
-  const site = sourceUrl
-    ? `https://abdulrhman.ai/?url=${encodeURIComponent(sourceUrl)}`
-    : "https://abdulrhman.ai";
   const shareTarget = sourceUrl || `https://t.me/${BOT_USERNAME.replace(/^@/, "")}`;
-  const share = `https://t.me/share/url?url=${encodeURIComponent(shareTarget)}&text=${encodeURIComponent("شوف هذا على برق ⚡️")}`;
-  const rows: { text: string; url?: string; callback_data?: string }[][] = [
-    [
-      { text: "برق AI", callback_data: "go:ai" },
-      { text: "لخّصه", callback_data: "ai:pack" },
-    ],
-    [
-      { text: "شارك", url: share },
-      { text: "قيّم", callback_data: "rt:ask" },
-    ],
-    [
-      { text: "ادعمنا بقهوة", callback_data: "go:coffee" },
-      { text: "الدعم", url: SUPPORT_URL },
-    ],
-    [{ text: "حمّله من الموقع", url: site }],
-  ];
-  if (accountUrl) rows.push([{ text: "حسابي", url: accountUrl }]);
+  const share = `https://t.me/share/url?url=${encodeURIComponent(shareTarget)}&text=${encodeURIComponent("مقطع من برق ⚡️")}`;
+  const rows: { text: string; url?: string; callback_data?: string }[][] = [];
+  if (kind === "video" || kind === "gif") {
+    rows.push([{ text: "✂️ قصّ", callback_data: "fx:cut" }]);
+  }
+  rows.push([{ text: "📣 جهّزه للنشر", callback_data: "fx:post" }]);
+  rows.push([
+    { text: "🔖 احفظ", callback_data: "fx:save" },
+    { text: "↗️ مشاركة", url: share },
+  ]);
   return rows;
 }
 

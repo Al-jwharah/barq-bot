@@ -129,6 +129,42 @@ export async function audioWithCoverToMp4(
   });
 }
 
+export async function clipBuffer(input: Buffer, startSec: number, endSec: number, timeoutMs = 70000): Promise<Blob> {
+  return withTemp(async (dir) => {
+    const source = join(dir, "in.bin");
+    const output = join(dir, "clip.mp4");
+    await writeFile(source, input);
+    await run(
+      [
+        "-y",
+        "-ss",
+        String(startSec),
+        "-to",
+        String(endSec),
+        "-i",
+        source,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+faststart",
+        output,
+      ],
+      timeoutMs,
+    );
+    return new Blob([await readFile(output)], { type: "video/mp4" });
+  });
+}
+
 export async function blobToMp3(blob: Blob, timeoutMs = 45000): Promise<Blob> {
   return withTemp(async (dir) => {
     const input = join(dir, "in.bin");

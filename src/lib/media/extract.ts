@@ -228,5 +228,6 @@ export async function extractMedia(input: string): Promise<ExtractResult> {
   }
 
   if (errors.some((e) => isFileTooLarge(e))) throw fileTooLargeError();
-  throw new Error(errors[0] || "ما قدرت أحمّل هذا الرابط");
+  const friendly = errors.find((e) => /[\u0600-\u06FF]/.test(e) && e.length < 400);
+  throw new Error(friendly || errors[0] || "ما لقيت فيديو قابل للتحميل في هذا الرابط.");
 }

@@ -20,46 +20,39 @@ function metas(html: string, prop: string): string[] {
   return [...new Set(out)];
 }
 
+function looksLikeImage(url: string): boolean {
+  return /\.(jpe?g|png|webp|gif|bmp|svg|avif)(\?|$)/i.test(url);
+}
+
+export function videoUrlsFromHtml(html: string): string[] {
+  const meta = [
+    ...metas(html, "og:video"),
+    ...metas(html, "og:video:url"),
+    ...metas(html, "og:video:secure_url"),
+    ...metas(html, "twitter:player:stream"),
+  ];
+  const tags = [...html.matchAll(/<(?:video|source)\b[^>]*\bsrc=["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1] ?? "");
+  const json = [...html.matchAll(/"contentUrl"\s*:\s*"(https?:[^"]+)"/gi)].map((m) =>
+    (m[1] ?? "").replace(/\\u0026/g, "&").replace(/\\\//g, "/"),
+  );
+  return [...new Set([...meta, ...tags, ...json])]
+    .map((u) => u.split("&" + "amp;").join("&").trim())
+    .filter((u) => /^https?:\/\//.test(u) && !u.includes(".m3u8") && !looksLikeImage(u));
+}
+
 export async function extractGeneric(url: string): Promise<ExtractResult> {
   const { text, finalUrl } = await fetchText(url, undefined, 12000);
-  const videos = [
-    ...metas(text, "og:video"),
-    ...metas(text, "og:video:url"),
-    ...metas(text, "og:video:secure_url"),
-    ...metas(text, "twitter:player:stream"),
-  ].filter((u) => /^https?:\/\//.test(u) && !u.includes(".m3u8"));
-
-  const images = [
-    ...metas(text, "og:image"),
-    ...metas(text, "og:image:url"),
-    ...metas(text, "twitter:image"),
-  ].filter((u) => /^https?:\/\//.test(u));
-
+  const videos = videoUrlsFromHtml(text);
   const title = metas(text, "og:title")[0] ?? metas(text, "twitter:title")[0];
   const desc = metas(text, "og:description")[0];
-
-  const items: MediaItem[] = [];
-  for (const v of videos) {
-    items.push({
-      kind: "video",
-      url: v,
-      thumbnail: images[0],
-      variants: [{ url: v, quality: qualityLabel(), contentType: "video/mp4" }],
-    });
+  if (videos.length === 0) {
+    throw new Error("ما لقيت فيديو قابل للتحميل في هذا الرابط. أرسل رابط المقطع نفسه.");
   }
-  if (items.length === 0) {
-    for (const img of images.slice(0, 4)) {
-      items.push({
-        kind: "photo",
-        url: img,
-        thumbnail: img,
-        variants: [{ url: img, quality: "أصل", contentType: "image/jpeg" }],
-      });
-    }
-  }
-  if (items.length === 0) {
-    throw new Error("ما لقيت فيديو أو صورة قابلة للتحميل في الرابط");
-  }
+  const items: MediaItem[] = videos.map((v) => ({
+    kind: "video",
+    url: v,
+    variants: [{ url: v, quality: qualityLabel(), contentType: "video/mp4" }],
+  }));
   return {
     platform: "generic",
     title,

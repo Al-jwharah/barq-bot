@@ -43,13 +43,13 @@ export function userFailMessage(raw: string): string {
   if (/unavailable|has been removed|deleted|not exist|account terminated/.test(s)) {
     return "الفيديو محذوف أو غير متاح.";
   }
-  if (/unsupported|غير مدعوم|منصة غير/.test(s)) return "هذا الموقع غير مدعوم حاليًا.";
+  if (/unsupported|غير مدعوم|منصة غير/.test(s)) return "ما لقيت فيديو قابل للتحميل في هذا الرابط.";
   if (/invalid url|malformed|not a valid/.test(s)) return "الرابط غير صالح. أرسل رابط فيديو مباشر.";
   if (/expired link|link has expired|link expired|this link (has )?expired/.test(s)) {
     return "انتهت صلاحية الرابط. أرسل رابطًا جديدًا.";
   }
   if (/too large|payload too large|file size|50\s*mb|أكبر من حد|حجم الملف|oversize_host/.test(s)) {
-    return "المقطع أكبر من تليجرام. حمّله مباشرة من abdulrhman.ai";
+    return "المقطع أكبر من حد تليجرام (حوالي 50 ميغا). أرسل رابط مقطع أقصر.";
   }
   if (/blocked|nsfw|adult/.test(s)) return "تعذر تحميل هذا المحتوى.";
   if (/timeout|timed out|etimedout|download_timeout|aborted/.test(s)) return "انتهت مهلة المصدر. حاول لاحقًا.";

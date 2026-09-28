@@ -24,7 +24,9 @@ test("yt-dlp is spawned with argv, never a shell string", () => {
   const src = readFileSync(new URL("./ytdlp.ts", import.meta.url), "utf8");
   assert.equal(/exec\s*\(\s*[`'"]/.test(src), false);
   assert.equal(/execFile\s*\(\s*[`'"]yt-dlp \$\{/.test(src), false);
-  assert.match(src, /(?:spawn|spawnImpl)\(\s*"yt-dlp"/);
+  assert.match(src, /spawnImpl\(bin, args, options\)/);
+  assert.match(src, /YTDLP_URL = "https:\/\/github.com\/yt-dlp\/yt-dlp\/releases\/download\//);
+  assert.equal(/spawn\(\s*`/.test(src), false);
   assert.match(src, /shell:\s*false/);
   assert.match(src, /--no-playlist/);
   assert.match(src, /--restrict-filenames/);

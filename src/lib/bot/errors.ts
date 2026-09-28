@@ -1,7 +1,7 @@
 export const ERROR_MESSAGES = {
   INVALID_URL: "الرابط غير صحيح. أرسل رابطًا كاملًا يبدأ بـ https://",
   PRIVATE_CONTENT: "لا يمكن تحميل هذا المحتوى لأنه خاص أو يتطلب تسجيل دخول.",
-  UNSUPPORTED_PLATFORM: "هذه المنصة غير مدعومة حاليًا.",
+  UNSUPPORTED_PLATFORM: "ما لقيت فيديو قابل للتحميل في هذا الرابط.",
   FILE_TOO_LARGE: "حجم الملف أكبر من الحد المسموح به.",
   DOWNLOAD_TIMEOUT: "استغرق التحميل وقتًا طويلًا. حاول بجودة أقل أو أعد المحاولة لاحقًا.",
   SOURCE_UNAVAILABLE: "المصدر غير متاح حاليًا.",

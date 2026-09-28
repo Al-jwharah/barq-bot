@@ -799,7 +799,7 @@ export async function sendComebacks(limit = 25) {
   `;
   const NUDGE_LINES = [
     "برق ⚡️ الصق الرابط إذا عندك مقطع.",
-    "الموقع جاهز للمقطع الكبير: abdulrhman.ai",
+    "الصق الرابط هنا ويصلك الملف في المحادثة.",
     "لخّصه وكابشن تحت آخر مقطع.",
   ];
   let sent = 0;

@@ -14,7 +14,8 @@ export type AwaitKind =
   | "feedback"
   | "hostfile"
   | "lib_search"
-  | "stickercut";
+  | "stickercut"
+  | "clip_range";
 
 const HOSTFILE_TTL_MS = 90_000;
 const g = globalThis as unknown as {
@@ -100,6 +101,7 @@ export type LastClip = {
   mediaUrl?: string;
   thumbnail?: string;
   kind?: string;
+  fileId?: string;
 };
 
 function lastClipMap(): Map<number, LastClip> {

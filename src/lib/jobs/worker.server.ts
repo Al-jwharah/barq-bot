@@ -145,8 +145,15 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     const { inlineKeyboard } = await import("../bot/telegram.server");
     const cap = clipCaption("barq_ibot");
     const markup = inlineKeyboard(clipActionRows(accountUrl, job.url));
-    if (hit.kind === "audio") await telegram.sendAudioUrl(chatId, hit.fileId, { caption: cap, reply_markup: markup });
-    else await telegram.sendVideoUrl(chatId, hit.fileId, { caption: cap, supports_streaming: true, reply_markup: markup });
+    const sent =
+      hit.kind === "audio"
+        ? await telegram.sendAudioUrl(chatId, hit.fileId, { caption: cap, reply_markup: markup })
+        : await telegram.sendVideoUrl(chatId, hit.fileId, { caption: cap, supports_streaming: true, reply_markup: markup });
+    const fid = sent.video?.file_id || (sent as { audio?: { file_id?: string } }).audio?.file_id;
+    if (fid) {
+      const { setLastClip } = await import("../bot/session.server");
+      setLastClip(fromId, { url: job.url, kind: hit.kind === "audio" ? "audio" : "video", fileId: fid });
+    }
     await sendAfterDownload(chatId);
     if (await applyJobQuota(job.id)) {
       await bumpDownload(fromId);
@@ -303,23 +310,18 @@ export async function processDownloadJob(id?: string): Promise<{ id?: string; st
       const { markTelegramUpdateFailed } = await import("../bot/telegram-updates.server");
       await markTelegramUpdateFailed(job.update_id, shown).catch(() => undefined);
     }
-    const page = `https://abdulrhman.ai/?url=${encodeURIComponent(job.url)}`;
-    const withLink = `${shown}\n\nإذا ما نزل هنا، افتحه من الموقع:\n${page}`;
     const failKb = inlineKeyboard([
-      [
-        { text: "إعادة المحاولة", callback_data: `job:retry:${job.id}` },
-        { text: "تحميل من الموقع", url: page },
-      ],
+      [{ text: "إعادة المحاولة", callback_data: `job:retry:${job.id}` }],
       [{ text: "الدعم", url: SUPPORT_URL }],
     ]);
     if (job.status_message_id) {
       await telegram
-        .editMessageText(chatId, job.status_message_id, withLink, { reply_markup: failKb })
+        .editMessageText(chatId, job.status_message_id, shown, { reply_markup: failKb })
         .catch(async () => {
-          await editStatus(chatId, job.status_message_id, withLink);
+          await editStatus(chatId, job.status_message_id, shown);
         });
     } else {
-      await telegram.sendMessage(chatId, withLink, { reply_markup: failKb });
+      await telegram.sendMessage(chatId, shown, { reply_markup: failKb });
     }
     return { id: job.id, status: "failed" };
   }

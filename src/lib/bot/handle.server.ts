@@ -124,7 +124,7 @@ import {
   type UserRole,
 } from "./keyboard";
 import { classifyIntent } from "./router";
-import { publicStartCaption } from "./copy";
+import { HELP_TEXT, publicStartCaption } from "./copy";
 import { handleUpload } from "./handlers/upload.handler";
 import { handleAnalyze, handleStudio } from "./handlers/ai.handler";
 import { handleLive } from "./handlers/live.handler";
@@ -170,68 +170,12 @@ function ownerMediaKind(msg: TgMessage): string | null {
   return null;
 }
 
-function howText(free: number, channel: string, role: UserRole = "free"): string {
-  const join = channel
-    ? `انضم إلى @${channel} (تحديثات وأخبار ومسابقات) لتحصل على ${free} تحميلات مجانية.`
-    : `${free} تحميلات مجانية للتجربة.`;
-  if (role === "sub") {
-    return `كيف يعمل برق ⚡️
-
-1. انسخ رابط المقطع
-2. الصقه هنا
-3. يصلك الملف بأعلى جودة
-
-اشتراكك ساري — التحميل بلا حدود.
-
-الدعم
-@${SUPPORT_USERNAME}`;
-  }
-  if (TEMP_FREE) {
-    return `كيف يعمل برق ⚡️
-
-1. انسخ رابط المقطع من أي منصة
-2. الصقه هنا
-3. يصلك الملف
-
-التحميل مجاني للجميع.
-المشترك الساري يأخذ أولوية الطابور، ٥ روابط معًا، السجل، ورسائل AI أكثر.
-
-تنبيه: المحتوى الإباحي و+18 قد يودي للحظر. نحن براء أمام الله من هذا المحتوى.
-
-التحديثات: @${channel || "barq_all"}
-الدعم @${SUPPORT_USERNAME}
-${SUPPORT_EMAIL}`;
-  }
-  return `كيف يعمل برق ⚡️
-
-1. انسخ رابط المقطع من تيك توك أو إنستغرام أو يوتيوب أو إكس أو فيسبوك أو أي منصة
-2. الصقه هنا
-3. يصلك الملف بأعلى جودة
-
-تنبيه: المحتوى الإباحي و+18 قد يودي للحظر. نحن براء أمام الله من هذا المحتوى.
-
-المجاني
-${join}
-بعد نفادها: اشترك، أو شاهد إعلانًا لتجديد ${free} فيديوهات.
-
-الاشتراك
-${SUB_SAR} ريال شهريًا بنجوم تليجرام — تحميل بلا حدود ورابط مختصر لكل مقطع.
-
-الدعم
-@${SUPPORT_USERNAME}
-
-حد تليجرام: إذا كان الأصل أكبر، تصلك أزرار الجودة المباشرة.`;
-}
-
 function startCaption(free: number, channel: string, role: UserRole): string {
   if (role === "owner") {
     return `${BOT_DISPLAY_NAME}
 لوحة المالك جاهزة.
 
-الصق رابطًا، أو افتح الموقع:
-https://abdulrhman.ai
-
-لخّصه وكابشن ورابط مؤقت تحت.`;
+الصق رابط أي فيديو هنا. الملف يوصل في المحادثة.`;
   }
   if (role === "sub") {
     return `${BOT_DISPLAY_NAME}
@@ -306,16 +250,7 @@ function navKeyboard(role: UserRole, channel?: string): TgBtn[][] {
       [{ text: "دعم فني", url: SUPPORT_URL }],
     ];
   }
-  const rows: TgBtn[][] = [
-    [{ text: "Barq AI", callback_data: "go:ai" }],
-    [{ text: "رابط مؤقت", callback_data: "go:short" }],
-    [
-      { text: "رحلتي", callback_data: "gx:j:list" },
-      { text: "إنجازاتي", callback_data: "gx:ach" },
-    ],
-    [{ text: "حالة برق", callback_data: "go:ops" }],
-    [{ text: "كيف يعمل", callback_data: "go:how" }],
-  ];
+  const rows: TgBtn[][] = [[{ text: "❔ المساعدة", callback_data: "go:how" }]];
   if (channel) {
     if (TEMP_FREE) {
       rows.push([{ text: "قناة التحديثات", url: joinHref(channel) }]);
@@ -402,17 +337,8 @@ function estimatedBytes(v: { size?: number; bitrate?: number }, duration?: numbe
   return undefined;
 }
 
-async function clipMarkup(chatId: number, sourceUrl?: string) {
-  let accountUrl: string | undefined;
-  if (chatId > 0) {
-    try {
-      const { issueAccountLink } = await import("./account.server");
-      accountUrl = await issueAccountLink(chatId);
-    } catch {
-      accountUrl = undefined;
-    }
-  }
-  return inlineKeyboard(clipActionRows(accountUrl, sourceUrl));
+async function clipMarkup(chatId: number, sourceUrl?: string, kind?: "video" | "photo" | "gif" | "audio") {
+  return inlineKeyboard(clipActionRows(undefined, sourceUrl, kind ?? "video"));
 }
 
 async function sendVideoItem(
@@ -435,7 +361,7 @@ async function sendVideoItem(
   }
   const capKind = item.kind === "audio" ? "audio" : "video";
   const cap = withCaption ? signatureCaption(capKind, result.platform, result.sourceUrl) : undefined;
-  const markup = await clipMarkup(chatId, result.sourceUrl);
+  const markup = await clipMarkup(chatId, result.sourceUrl, item.kind === "audio" ? "audio" : item.kind === "gif" ? "gif" : item.kind === "photo" ? "photo" : "video");
   const extra: Record<string, unknown> = { reply_markup: markup };
   if (item.kind !== "audio") extra.supports_streaming = true;
   if (cap) extra.caption = cap;
@@ -476,6 +402,8 @@ async function sendVideoItem(
         const fid = sent.video?.file_id;
         if (fid) {
           const { saveTelegramFile } = await import("./file-cache.server");
+          const { rememberDeliveredFile } = await import("./file-actions.server");
+          rememberDeliveredFile(chatId, fid);
           await saveTelegramFile(result.sourceUrl, fid, "video").catch(() => undefined);
         }
         return sent.message_id;
@@ -512,6 +440,8 @@ async function sendVideoItem(
       const uploaded = await sendVideoFile(chatId, blob, filename(result, item, v.quality), fileExtra);
       if (uploaded?.file_id) {
         const { saveTelegramFile } = await import("./file-cache.server");
+        const { rememberDeliveredFile } = await import("./file-actions.server");
+        rememberDeliveredFile(chatId, uploaded.file_id);
         await saveTelegramFile(result.sourceUrl, uploaded.file_id, "video").catch(() => undefined);
       }
       return uploaded?.message_id ?? null;
@@ -533,7 +463,7 @@ async function sendPhotoItem(
   stamp: boolean,
 ): Promise<number | null> {
   const cap = withCaption ? signatureCaption("photo", result.platform, result.sourceUrl) : undefined;
-  const markup = await clipMarkup(chatId, result.sourceUrl);
+  const markup = await clipMarkup(chatId, result.sourceUrl, item.kind === "audio" ? "audio" : item.kind === "gif" ? "gif" : item.kind === "photo" ? "photo" : "video");
   const photoExtra: Record<string, unknown> = { reply_markup: markup };
   if (cap) photoExtra.caption = cap;
   if (!stamp) {
@@ -577,13 +507,15 @@ async function sendSunoVideo(chatId: number, result: ExtractResult, item: MediaI
   const { audioWithCoverToMp4 } = await import("../media/convert.server");
   const mp4 = await audioWithCoverToMp4(bytes, cover);
   const cap = signatureCaption("video", result.platform, result.sourceUrl);
-  const markup = await clipMarkup(chatId, result.sourceUrl);
+  const markup = await clipMarkup(chatId, result.sourceUrl, "video");
   const fileExtra: Record<string, string> = { reply_markup: JSON.stringify(markup) };
   if (cap) fileExtra.caption = cap;
   const title = (result.title || "barq").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim() || "barq";
   const uploaded = await sendVideoFile(chatId, mp4, `${title}.mp4`, fileExtra);
   if (uploaded?.file_id) {
     const { saveTelegramFile } = await import("./file-cache.server");
+    const { rememberDeliveredFile } = await import("./file-actions.server");
+    rememberDeliveredFile(chatId, uploaded.file_id);
     await saveTelegramFile(result.sourceUrl, uploaded.file_id, "video").catch(() => undefined);
   }
   return uploaded?.message_id ?? null;
@@ -617,20 +549,15 @@ export async function deliver(chatId: number, result: ExtractResult, stamp = fal
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (!/OVERSIZE_HOST_LINK|FILE_TOO_LARGE|حجم الملف|أكبر من الحد/.test(msg)) throw err;
-      const hosted = await sendHostedMedia(chatId, fromId ?? chatId, result);
-      if (hosted) ids.push(hosted);
+      throw new Error("الملف أكبر من حد تليجرام (حوالي 50 ميغا). أرسل رابط مقطع أقصر.");
     }
     first = false;
   }
   return ids;
 }
 
-function prefersWebsite(result: ExtractResult): boolean {
-  const item = result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") || result.items[0];
-  if (!item || item.kind === "photo") return false;
-  if ((item.duration ?? 0) > 12 * 60) return true;
-  const sizes = (item.variants ?? []).map((v) => v.size ?? 0).filter((n) => n > 0);
-  return sizes.length > 0 && Math.min(...sizes) > 45 * 1024 * 1024;
+function prefersWebsite(_result: ExtractResult): boolean {
+  return false;
 }
 
 async function sendHostedMedia(chatId: number, fromId: number, result: ExtractResult): Promise<number | null> {
@@ -1421,6 +1348,57 @@ async function handleCallback(cb: TgCallbackQuery) {
     }
     return;
   }
+  if (data === "fx:cut") {
+    await telegram.answerCallback(cb.id);
+    setAwait(fromId, "clip_range");
+    await telegram.sendMessage(targetChat, "اكتب مدى القص مثل 00:12-00:35\nأقصى مدة 3 دقائق.");
+    return;
+  }
+  if (data === "fx:post") {
+    await telegram.answerCallback(cb.id);
+    const { publishDraft } = await import("./file-actions.server");
+    await telegram.sendMessage(targetChat, publishDraft(lastClip(fromId)));
+    return;
+  }
+  if (data === "fx:save") {
+    try {
+      const { saveCurrentClip } = await import("./file-actions.server");
+      const saved = await saveCurrentClip(fromId);
+      await telegram.answerCallback(cb.id, saved.message, !saved.ok);
+    } catch {
+      await telegram.answerCallback(cb.id, "تعذر الحفظ", true);
+    }
+    return;
+  }
+  if (data === "fx:saved" || data === "lib:mine") {
+    await telegram.answerCallback(cb.id);
+    const { listSaves } = await import("./file-actions.server");
+    const rows = await listSaves(fromId).catch(() => []);
+    if (!rows.length) {
+      await telegram.sendMessage(targetChat, "محفوظاتك فاضية. بعد التحميل اضغط احفظ.");
+      return;
+    }
+    await telegram.sendMessage(targetChat, "محفوظاتك", {
+      reply_markup: inlineKeyboard(
+        rows.map((r) => [{ text: r.title.slice(0, 28), callback_data: `sv:${r.id}` }]),
+      ),
+    });
+    return;
+  }
+  if (data.startsWith("sv:")) {
+    const id = data.slice(3);
+    const { savedFile } = await import("./file-actions.server");
+    const file = await savedFile(fromId, id).catch(() => null);
+    if (!file) {
+      await telegram.answerCallback(cb.id, "ما لقيت الملف", true);
+      return;
+    }
+    await telegram.answerCallback(cb.id);
+    await telegram.sendVideoUrl(targetChat, file.fileId, { caption: file.title.slice(0, 120) }).catch(async () => {
+      await telegram.sendMessage(targetChat, "انحفظ الرابط بس ملف تليجرام ما رجع. أعد التحميل ثم احفظه.");
+    });
+    return;
+  }
   if (data === "go:ai") {
     await telegram.answerCallback(cb.id);
     await telegram.sendMessage(
@@ -1459,8 +1437,7 @@ async function handleCallback(cb: TgCallbackQuery) {
     return;
   }
   if (data === "go:how") {
-    const s = await botSettings();
-    await telegram.sendMessage(targetChat, howText(s.freeDownloads, s.requiredChannel, roleOf(fromId, member)), {
+    await telegram.sendMessage(targetChat, HELP_TEXT, {
       reply_markup: await keysFor(fromId, member),
     });
     return;
@@ -1568,6 +1545,7 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
   const item = result.items[0];
   const mediaUrl = pickPlayUrl(result);
   if (!item || !mediaUrl) return;
+  const prev = lastClip(fromId);
   setLastClip(fromId, {
     url: result.sourceUrl,
     title: result.title ?? result.text,
@@ -1575,6 +1553,7 @@ export async function sendPlayCard(chatId: number, fromId: number, result: Extra
     mediaUrl,
     thumbnail: item.thumbnail,
     kind: item.kind,
+    fileId: prev?.fileId,
   });
   const { rememberClip } = await import("./library.server");
   await rememberClip(fromId, {
@@ -1757,23 +1736,10 @@ async function handleDownload(
       return;
     }
     busy.add(chatId);
-    const status = await telegram.sendMessage(chatId, "⚡ استلمت الرابط ✅", {
-      reply_markup: inlineKeyboard([
-        [
-          { text: "إلغاء التحميل", callback_data: `job:cancel:${job.id}` },
-          { text: "طابوري", callback_data: "lib:queue" },
-        ],
-      ]),
+    const status = await telegram.sendMessage(chatId, "أفحص الرابط", {
+      reply_markup: inlineKeyboard([[{ text: "إلغاء", callback_data: `job:cancel:${job.id}` }]]),
     });
     await setJobStatusMessage(job.id, status.message_id).catch(() => undefined);
-    const { userQueuePosition, queueEta } = await import("../jobs/queue.server").then(async (q) => ({
-      userQueuePosition: q.userQueuePosition,
-      queueEta: (await import("./product.server")).queueEta,
-    }));
-    const pos = await userQueuePosition(fromId).catch(() => 1);
-    await telegram
-      .editMessageText(chatId, status.message_id, `📥 في الطابور · دورك ${pos}\n${queueEta(pos)}`)
-      .catch(() => undefined);
     await logEvent({ requestId: rid, tgId: fromId, action: "enqueue", status: "pending", detail: job.id });
     await kickJobWorker(job.id);
   } catch (err) {
@@ -2376,9 +2342,8 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     await sendSystemStatus(chatId);
     return;
   }
-  if (text.startsWith("/help") || text === "كيف يعمل") {
-    const s = await botSettings();
-    await telegram.sendMessage(chatId, howText(s.freeDownloads, s.requiredChannel, roleOf(fromId, member)), {
+  if (text.startsWith("/help") || text === "كيف يعمل" || text === "❔ المساعدة" || text === "المساعدة") {
+    await telegram.sendMessage(chatId, HELP_TEXT, {
       reply_markup: await keysFor(fromId, member),
     });
     return;
@@ -2423,7 +2388,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     return;
   }
   if (text === "الموقع") {
-    await telegram.sendMessage(chatId, "الموقع\nhttps://abdulrhman.ai\nالصق الرابط هناك إذا كان المقطع كبيرًا.", {
+    await telegram.sendMessage(chatId, "التحميل يصير هنا في تيليجرام. الصق رابط الفيديو.", {
       reply_markup: await keysFor(fromId, member),
     });
     return;
@@ -2539,6 +2504,36 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     }
     awaitMap().set(fromId, "code");
     await telegram.sendMessage(chatId, "أرسل كود التفعيل الآن.");
+    return;
+  }
+
+  if (text === "⚡ حمّل رابط" || text === "حمّل رابط") {
+    await telegram.sendMessage(chatId, "أرسل رابط المقطع هنا.", { reply_markup: await keysFor(fromId, member) });
+    return;
+  }
+  if (text === "🔖 محفوظاتي" || text === "محفوظاتي") {
+    const { listSaves } = await import("./file-actions.server");
+    const rows = await listSaves(fromId).catch(() => []);
+    if (!rows.length) {
+      await telegram.sendMessage(chatId, "محفوظاتك فاضية. بعد التحميل اضغط احفظ.");
+      return;
+    }
+    await telegram.sendMessage(chatId, "محفوظاتك", {
+      reply_markup: inlineKeyboard(rows.map((r) => [{ text: r.title.slice(0, 28), callback_data: `sv:${r.id}` }])),
+    });
+    return;
+  }
+  if (peekAwait(fromId) === "clip_range" && !/https?:\/\//i.test(text)) {
+    clearAwait(fromId);
+    await telegram.sendChatAction(chatId, "upload_video");
+    try {
+      const { clipLastVideo } = await import("./file-actions.server");
+      const blob = await clipLastVideo(fromId, text);
+      await sendVideoFile(chatId, blob, "clip.mp4", {});
+      await telegram.sendMessage(chatId, "تم القص.");
+    } catch (err) {
+      await telegram.sendMessage(chatId, err instanceof Error ? err.message : "تعذر القص.");
+    }
     return;
   }
 

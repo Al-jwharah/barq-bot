@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { chmod, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -14,6 +15,51 @@ export { setJobChild, killJobProcess } from "../jobs/proc-registry";
 
 const YTDLP_TIMEOUT_MS = 28000;
 const ALLOWED_EXTRA_FLAGS = new Set(["--extractor-args"]);
+/** Pinned standalone Linux binary. Not taken from the user URL. */
+const YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux";
+const YTDLP_CACHED = join(tmpdir(), "barq-ytdlp");
+
+let ytdlpReady: Promise<string> | null = null;
+
+function ytdlpOnPath(): string | null {
+  const fromEnv = process.env.YT_DLP_PATH?.trim();
+  if (fromEnv && existsSync(fromEnv)) return fromEnv;
+  const dirs = (process.env.PATH || "").split(":").filter(Boolean);
+  for (const dir of dirs) {
+    const full = join(dir, "yt-dlp");
+    if (existsSync(full)) return full;
+  }
+  for (const full of ["/usr/local/bin/yt-dlp", "/usr/bin/yt-dlp"]) {
+    if (existsSync(full)) return full;
+  }
+  return null;
+}
+
+/** Resolve a fixed yt-dlp binary. Downloads the pinned release into tmp when the image has none. */
+export function ensureYtDlp(): Promise<string> {
+  const found = ytdlpOnPath();
+  if (found) return Promise.resolve(found);
+  if (existsSync(YTDLP_CACHED)) return Promise.resolve(YTDLP_CACHED);
+  if (!ytdlpReady) {
+    ytdlpReady = (async () => {
+      const res = await fetch(YTDLP_URL, { signal: AbortSignal.timeout(50_000) });
+      if (!res.ok) throw new Error("تعذر تجهيز أداة التحميل");
+      const bin = Buffer.from(await res.arrayBuffer());
+      if (bin.length < 1_000_000 || bin.subarray(0, 4).toString("latin1") !== "\u007fELF") {
+        throw new Error("تعذر تجهيز أداة التحميل");
+      }
+      const part = `${YTDLP_CACHED}.part`;
+      await writeFile(part, bin);
+      await chmod(part, 0o755);
+      await rename(part, YTDLP_CACHED);
+      return YTDLP_CACHED;
+    })().catch((err) => {
+      ytdlpReady = null;
+      throw err;
+    });
+  }
+  return ytdlpReady;
+}
 
 /**
  * DOWNLOAD_TIMEOUT_MS defaults to 900000 (15m) in config.server, but Vercel
@@ -202,13 +248,14 @@ function downloadTimeoutMs(fallback: number): number {
   return Math.min(raw, DOWNLOAD_TIMEOUT_CAP_MS);
 }
 
-export function spawnYtDlp(
+export async function spawnYtDlp(
   args: string[],
   cwd: string,
   timeoutMs = YTDLP_TIMEOUT_MS,
   signal?: AbortSignal,
 ): Promise<{ code: number; stdout: string }> {
   const safeCwd = assertSafeDir(cwd);
+  const bin = spawnImpl === spawn ? await ensureYtDlp() : "yt-dlp";
   return new Promise((resolvePromise, reject) => {
     if (signal?.aborted) {
       reject(new Error("DOWNLOAD_CANCELLED"));
@@ -221,10 +268,7 @@ export function spawnYtDlp(
       env: { ...process.env, PYTHONWARNINGS: "ignore" },
       windowsHide: true,
     };
-    const child =
-      spawnImpl === spawn
-        ? spawn("yt-dlp", args, options)
-        : spawnImpl("yt-dlp", args, options);
+    const child = spawnImpl(bin, args, options);
     const jobId = currentJobId();
     if (jobId) setJobChild(jobId, child);
     let stdout = "";

@@ -5,29 +5,21 @@ import { DAILY_CAP } from "./config.server";
 import { progressBar } from "./library.server";
 
 export function stageProgress(stage: "safe" | "extract" | "preview" | "upload" | "done"): { pct: number; bar: string; label: string } {
-  const map = { safe: 15, extract: 45, preview: 70, upload: 90, done: 100 } as const;
-  const pct = map[stage];
-  const width = 10;
-  const filled = Math.round((pct / 100) * width);
-  return {
-    pct,
-    bar: `${"█".repeat(filled)}${"░".repeat(width - filled)}`,
-    label:
-      stage === "safe"
-        ? "فحص الأمان"
-        : stage === "extract"
-          ? "تجهيز الملف"
-          : stage === "preview"
-            ? "معاينة"
-            : stage === "upload"
-              ? "رفع لتليجرام"
-              : "تم",
-  };
+  const map = { safe: 1, extract: 2, preview: 3, upload: 4, done: 5 } as const;
+  const label =
+    stage === "safe" || stage === "extract"
+      ? "أفحص الرابط"
+      : stage === "preview"
+        ? "أحمّل الملف"
+        : stage === "upload"
+          ? "أجهّزه لتيليجرام"
+          : "تم";
+  return { pct: map[stage], bar: "", label };
 }
 
 export function progressStatus(stage: Parameters<typeof stageProgress>[0], extra?: string): string {
   const p = stageProgress(stage);
-  return `${p.bar} ${p.pct}%\n${p.label}${extra ? `\n${extra}` : ""}`;
+  return extra ? `${p.label}\n${extra}` : p.label;
 }
 
 export function looksLikeLiveStream(url: string): boolean {

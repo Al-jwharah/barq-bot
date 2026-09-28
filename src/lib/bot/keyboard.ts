@@ -31,9 +31,8 @@ export const SUB_KEYBOARD = replyKeyboard([
 ]);
 
 export const FREE_KEYBOARD = replyKeyboard([
-  ["لخّصه وكابشن", "حسابي"],
-  ["ميزات المشترك", "كيف يعمل"],
-  ["الموقع"],
+  ["⚡ حمّل رابط", "🔖 محفوظاتي"],
+  ["❔ المساعدة"],
 ]);
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";
