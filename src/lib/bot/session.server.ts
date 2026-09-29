@@ -13,11 +13,13 @@ export type AwaitKind =
   | "gift"
   | "feedback"
   | "hostfile"
+  | "host_ttl"
   | "lib_search"
   | "stickercut"
   | "clip_range";
 
-const HOSTFILE_TTL_MS = 90_000;
+const HOSTFILE_TTL_MS = 180_000;
+const HOST_TTL_MS = 300_000;
 const g = globalThis as unknown as {
   __barqAwait?: Map<number, AwaitKind>;
   __barqAwaitAt?: Map<number, number>;
@@ -53,6 +55,10 @@ export function peekAwait(id: number): AwaitKind | undefined {
   if (!kind) return undefined;
   const at = awaitAt().get(id) ?? 0;
   if (kind === "hostfile" && Date.now() - at > HOSTFILE_TTL_MS) {
+    clearAwait(id);
+    return undefined;
+  }
+  if (kind === "host_ttl" && Date.now() - at > HOST_TTL_MS) {
     clearAwait(id);
     return undefined;
   }

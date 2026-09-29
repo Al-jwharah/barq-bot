@@ -267,7 +267,7 @@ export const PUBLIC_COMMANDS = [
   { command: "help", description: "كيف يعمل" },
   { command: "status", description: "حالة برق" },
   { command: "ai", description: "Barq AI" },
-  { command: "short", description: "رابط مختصر 24 ساعة" },
+  { command: "short", description: "رابط مؤقت لملف: 12 أو 24 ساعة" },
   { command: "account", description: "حسابي على الويب" },
   { command: "invite", description: "دعوة أصدقاء" },
   { command: "live", description: "متابعة بث مباشر" },

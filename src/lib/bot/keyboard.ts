@@ -25,13 +25,14 @@ export const OWNER_ONLY_LABELS = new Set([
 ]);
 
 export const SUB_KEYBOARD = replyKeyboard([
-  ["رابط مؤقت", "رفع ملف"],
+  ["🔗 رابط مؤقت"],
   ["لخّصه", "كابشن"],
   ["حالة الاشتراك", SUPPORT_BTN],
 ]);
 
 export const FREE_KEYBOARD = replyKeyboard([
   ["⚡ حمّل رابط", "🔖 محفوظاتي"],
+  ["🔗 رابط مؤقت"],
   ["❔ المساعدة"],
 ]);
 

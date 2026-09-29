@@ -20,7 +20,7 @@ const LIVE = new Set(["/live", "البث", "live recorder"]);
 const ACCOUNT = new Set(["حسابي", "/account", "سجلي", "/history", "سجل التحميل"]);
 const POINTS = new Set(["نقاطي", "/points"]);
 const SUB = new Set(["الاشتراك", "اشترك الآن", "تجديد الاشتراك", "/sub", "حالة الاشتراك"]);
-const SHORT = new Set(["رابط مؤقت", "رابط مختصر 24س", "اشغله", "/short"]);
+const SHORT = new Set(["رابط مؤقت", "🔗 رابط مؤقت", "رابط مختصر 24س", "اشغله", "/short"]);
 const HELP = new Set(["كيف يعمل", "/help"]);
 
 function norm(text: string): string {

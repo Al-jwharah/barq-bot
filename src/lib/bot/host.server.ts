@@ -65,6 +65,7 @@ export async function hostTelegramFile(input: {
   fileName?: string;
   mime?: string;
   tgId: number;
+  hours?: 12 | 24;
 }): Promise<{ id: string; mediaUrl: string; expiresAt: string }> {
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!token) throw new Error("التخزين غير جاهز");
@@ -90,6 +91,7 @@ export async function hostTelegramFile(input: {
     addRandomSuffix: false,
     contentType: input.mime || blob.type || "application/octet-stream",
   });
+  const { dropTtlMs } = await import("./drop.server");
   const clip = await createClipLink({
     tgId: input.tgId,
     url: `clip:${pathname}`,
@@ -97,6 +99,7 @@ export async function hostTelegramFile(input: {
     platform: "upload",
     storageKey: pathname,
     maxHits: 200,
+    ttlMs: input.hours ? dropTtlMs(input.hours) : undefined,
   });
   return { id: clip.id, mediaUrl: "", expiresAt: clip.expiresAt };
 }

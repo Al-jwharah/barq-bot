@@ -877,11 +877,14 @@ export async function createClipLink(input: {
   platform?: string;
   storageKey?: string;
   maxHits?: number | null;
+  ttlMs?: number;
 }): Promise<{ id: string; expiresAt: string }> {
   await ensureClipColumns();
   const sql = await sqlClient();
   const created = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + CLIP_TTL_MS).toISOString();
+  const h12 = 12 * 60 * 60 * 1000;
+  const ttl = input.ttlMs === h12 || input.ttlMs === CLIP_TTL_MS ? input.ttlMs : CLIP_TTL_MS;
+  const expiresAt = new Date(Date.now() + ttl).toISOString();
   for (let i = 0; i < 6; i += 1) {
     const id = newClipId();
     try {

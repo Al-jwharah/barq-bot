@@ -113,6 +113,7 @@ async function chat(opts: {
   temperature?: number;
   json?: boolean;
   tools?: unknown[];
+  search?: boolean;
   model?: string;
 }): Promise<ChatResult> {
   const key = grokApiKey();
@@ -130,6 +131,9 @@ async function chat(opts: {
       temperature: opts.temperature ?? 0.2,
     };
     if (opts.json) body.response_format = { type: "json_object" };
+    if (opts.search) {
+      body.search_parameters = { mode: "auto", return_citations: true, max_search_results: 5 };
+    }
     if (opts.tools) {
       body.tools = opts.tools;
       body.tool_choice = "auto";
@@ -148,11 +152,12 @@ async function chat(opts: {
       });
       if (!res.ok) {
         lastErr = new Error(AI_USER_ERROR);
-        if (opts.tools) {
+        if (opts.tools || opts.search) {
           try {
             const plain = { ...body };
             delete plain.tools;
             delete plain.tool_choice;
+            delete plain.search_parameters;
             const res2 = await fetch(API, {
               method: "POST",
               headers: {
@@ -896,20 +901,30 @@ async function ownerChatConfig(): Promise<{
   };
 }
 
-const BARQ_AI_SYSTEM = `أنت برق AI، وكيل داخل بوت برق ⚡️ وليس مساعدًا ينتظر الأوامر فقط.
-- ابحث في الويب وتصفّح الصفحات العامة قبل ما تقول ما تعرف، إذا السؤال يحتاج معلومة حالية أو رابط.
-- تخصصك: التحميل، تلخيص آخر مقطع، كابشن، وشرح ما يسأل عنه المستخدم.
-- المحتوى الإباحي ممنوع. إذا طُلب لا تساعد في جلبه.
-- لا تختلق مشاهد لم ترها. التحميل يتم بلصق الرابط.
-- لا تكشف لوحة المالك ولا المفاتيح ولا تنفّذ أوامر الإدارة.`;
+const BARQ_AI_SYSTEM = `أنت برق داخل بوت تليجرام. ترد بالعربية، باختصار، وتفهم الرسالة في سياق البوت كله.
+
+ما يفعله البوت فعلًا:
+- لصق رابط فيديو يحمّل الملف داخل المحادثة. لا ترسل المستخدم لموقع.
+- بعد الملف: قص، تجهيز للنشر، حفظ، مشاركة.
+- رابط مؤقت مسار منفصل تمامًا: يضغط الزر، يرسل ملفًا، يختار 12 ساعة أو 24 ساعة، ويطلع رابط للملف. لا تخلطه مع التحميل ولا تنشئه من رابط فيديو.
+- لا يوجد تفريغ صوت ولا ترجمة. لا تخترعهما.
+- التحميل مجاني داخل المحادثة. لا تطلب اشتراكًا ولا إعلانًا.
+
+أدواتك:
+- البحث مفتوح تلقائيًا للمعلومة الحالية. استخدمه قبل ما تقول ما تعرف إذا السؤال عن خبر أو رقم أو حدث.
+- browse_page لقراءة صفحة https عامة.
+- queue_download إذا طلب تحميل رابط https محدد. التحميل يبدأ فعلًا.
+- my_jobs لحالة طابوره.
+- bot_guide إذا سأل ماذا يفعل البوت. لا تضف قدرات من عندك.
+
+ممنوع: المحتوى الإباحي، كشف المفاتيح، أوامر المالك، اختلاق مشاهد أو نسب.`;
 
 const PUBLIC_AGENT_TOOLS = [
-  { type: "web_search" },
   {
     type: "function",
     function: {
       name: "browse_page",
-      description: "افتح رابط https عامًا واقرأ نص الصفحة",
+      description: "اقرأ نص صفحة https عامة",
       parameters: {
         type: "object",
         properties: { url: { type: "string" } },
@@ -917,7 +932,42 @@ const PUBLIC_AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "queue_download",
+      description: "ابدأ تحميل رابط فيديو داخل تليجرام. لا تستخدمه لرابط مؤقت.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string" } },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "my_jobs",
+      description: "آخر مهام التحميل لهذا المستخدم",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "bot_guide",
+      description: "حقائق المنتج الحالية فقط",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
+
+const BOT_GUIDE = {
+  download: "الصق رابط الفيديو. الملف يوصل في المحادثة.",
+  afterFile: ["قص", "تجهيز للنشر", "حفظ", "مشاركة"],
+  tempLink: "زر رابط مؤقت ثم ملف ثم 12 أو 24 ساعة. منفصل عن التحميل.",
+  notAvailable: ["تفريغ", "ترجمة", "تحميل من الموقع"],
+};
 
 async function browsePublicPage(raw: string): Promise<string> {
   try {
@@ -936,16 +986,58 @@ async function browsePublicPage(raw: string): Promise<string> {
   }
 }
 
-async function runPublicTool(name: string, argsRaw: string): Promise<string> {
-  if (name !== "browse_page") return "الأداة غير متاحة هنا";
-  let url = "";
+async function runPublicTool(
+  name: string,
+  argsRaw: string,
+  ctx: { tgId: number; chatId: number },
+): Promise<string> {
+  let args: Record<string, unknown> = {};
   try {
-    url = String(JSON.parse(argsRaw || "{}").url || "");
+    args = JSON.parse(argsRaw || "{}") as Record<string, unknown>;
   } catch {
-    url = "";
+    args = {};
   }
-  if (!/^https?:\/\//i.test(url)) return "الرابط غير صالح";
-  return browsePublicPage(url);
+  if (name === "bot_guide") return JSON.stringify(BOT_GUIDE);
+  if (name === "browse_page") {
+    const url = String(args.url || "");
+    if (!/^https?:\/\//i.test(url)) return "الرابط غير صالح";
+    return browsePublicPage(url);
+  }
+  if (name === "my_jobs") {
+    const { listUserJobs } = await import("../jobs/queue.server");
+    const jobs = await listUserJobs(ctx.tgId, 6);
+    return JSON.stringify(jobs.map((job) => ({ id: job.id, status: job.status })));
+  }
+  if (name === "queue_download") {
+    const url = String(args.url || "").trim();
+    if (!/^https?:\/\//i.test(url)) return "الرابط غير صالح";
+    try {
+      const { assertSafeOutboundUrl } = await import("../media/ssrf");
+      await assertSafeOutboundUrl(url);
+      const { enqueueDownload, kickJobWorker } = await import("../jobs/queue.server");
+      const { queuePriorityFor } = await import("./queue-priority");
+      const { isOwnerId } = await import("./config.server");
+      const { getMember, isSubscribed } = await import("./store.server");
+      const member = await getMember(ctx.tgId);
+      const queued = await enqueueDownload({
+        tgId: ctx.tgId,
+        chatId: ctx.chatId,
+        url,
+        priority: queuePriorityFor({
+          owner: isOwnerId(ctx.tgId),
+          tier: member?.tier,
+          subscribed: member ? isSubscribed(member) : false,
+        }),
+      });
+      if (!queued) return "ما انضاف الطلب";
+      if (queued.denied) return queued.denied === "cap" ? "خلصت حصة اليوم" : "الطابور ممتلئ";
+      if (queued.job.status === "pending") await kickJobWorker(queued.job.id).catch(() => undefined);
+      return JSON.stringify({ ok: true, status: queued.job.status, reused: queued.reused });
+    } catch {
+      return "تعذر بدء التحميل";
+    }
+  }
+  return "الأداة غير متاحة هنا";
 }
 
 const publicHistory = new Map<number, ChatMessage[]>();
@@ -954,6 +1046,7 @@ export async function askBarqAI(
   userId: number,
   text: string,
   clip?: { url: string; title?: string; platform?: string },
+  chatId?: number,
 ): Promise<string> {
   if (!aiEnabled()) {
     return "برق AI متوقف مؤقتًا.";
@@ -993,6 +1086,7 @@ export async function askBarqAI(
         temperature: 0.55,
         model: "grok-4.5",
         tools: PUBLIC_AGENT_TOOLS,
+        search: true,
       });
       if (out.toolCalls.length) {
         messages.push({
@@ -1001,7 +1095,10 @@ export async function askBarqAI(
           tool_calls: out.toolCalls,
         });
         for (const call of out.toolCalls) {
-          const result = await runPublicTool(call.function.name, call.function.arguments || "");
+          const result = await runPublicTool(call.function.name, call.function.arguments || "", {
+            tgId: userId,
+            chatId: chatId ?? userId,
+          });
           messages.push({
             role: "tool",
             tool_call_id: call.id,

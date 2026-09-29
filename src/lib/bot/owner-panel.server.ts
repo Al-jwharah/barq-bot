@@ -8,7 +8,7 @@ import { permForCallback } from "./acl.server";
 
 export const OWNER_KEYBOARD = replyKeyboard([
   ["لوحة التحكم", "Barq AI"],
-  ["رابط مؤقت", "رفع ملف"],
+  ["🔗 رابط مؤقت"],
   ["لخّصه", "كابشن"],
   ["سجلي", "حدّي"],
   ["المراقبة", "النظام"],
