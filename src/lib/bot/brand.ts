@@ -59,9 +59,13 @@ export function clipActionRows(
   const share = `https://t.me/share/url?url=${encodeURIComponent(shareTarget)}&text=${encodeURIComponent("مقطع من برق ⚡️")}`;
   const rows: { text: string; url?: string; callback_data?: string }[][] = [];
   if (kind === "video" || kind === "gif") {
-    rows.push([{ text: "✂️ قصّ", callback_data: "fx:cut" }]);
+    rows.push([
+      { text: "✂️ قصّ", callback_data: "fx:cut" },
+      { text: "📣 جهّز", callback_data: "fx:post" },
+    ]);
+  } else {
+    rows.push([{ text: "📣 جهّز", callback_data: "fx:post" }]);
   }
-  rows.push([{ text: "📣 جهّزه للنشر", callback_data: "fx:post" }]);
   rows.push([
     { text: "🔖 احفظ", callback_data: "fx:save" },
     { text: "↗️ مشاركة", url: share },

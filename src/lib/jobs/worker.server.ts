@@ -1,7 +1,7 @@
 import { waitUntil } from "@vercel/functions";
 import { extractMedia } from "../media/extract";
 import type { ExtractResult } from "../media/types";
-import { extractWithYtdlp } from "../media/ytdlp";
+import { extractWithYtdlp, ensureYtDlp } from "../media/ytdlp";
 import { SUPPORT_URL } from "../bot/config.server";
 import {
   assertSafeMedia,
@@ -22,6 +22,7 @@ import { userFailMessage, userRetryMessage } from "./retry-policy";
 import { emit } from "../events/bus";
 
 void import("../events/download-completed");
+void ensureYtDlp().catch(() => undefined);
 
 function forceTikTokFile(result: ExtractResult): ExtractResult {
   if (result.platform !== "tiktok") return result;

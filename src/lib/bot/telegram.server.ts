@@ -160,6 +160,12 @@ export const telegram = {
     call("deleteMessage", { chat_id: chatId, message_id: messageId }, 8000).catch(() => undefined),
   sendChatAction: (chatId: number, action: string) =>
     call("sendChatAction", { chat_id: chatId, action }, 8000).catch(() => undefined),
+  react: (chatId: number, messageId: number, emoji = "⚡️") =>
+    call(
+      "setMessageReaction",
+      { chat_id: chatId, message_id: messageId, reaction: [{ type: "emoji", emoji }] },
+      8000,
+    ).catch(() => undefined),
   sendPhotoUrl: (chatId: number | string, photo: string, extra?: Record<string, unknown>) =>
     call<TgMessage>("sendPhoto", { chat_id: chatId, photo, ...extra }, 60000),
   sendVideoUrl: (chatId: number | string, video: string, extra?: Record<string, unknown>) =>

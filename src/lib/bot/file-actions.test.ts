@@ -22,7 +22,7 @@ test("publish draft does not invent scenes", () => {
 test("file buttons are the actions for that file", () => {
   const video = clipActionRows(undefined, "https://example.com/v", "video").flat().map((b) => b.text);
   const audio = clipActionRows(undefined, "https://example.com/a", "audio").flat().map((b) => b.text);
-  assert.deepEqual(video, ["✂️ قصّ", "📣 جهّزه للنشر", "🔖 احفظ", "↗️ مشاركة"]);
+  assert.deepEqual(video, ["✂️ قصّ", "📣 جهّز", "🔖 احفظ", "↗️ مشاركة"]);
   assert.equal(audio.includes("✂️ قصّ"), false);
   assert.equal(video.some((t) => /موقع|قهوة|قيّم/.test(t)), false);
 });

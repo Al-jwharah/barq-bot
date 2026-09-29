@@ -770,21 +770,29 @@ async function sendStart(chatId: number, member: Member) {
   }
   const s = await botSettings();
   const role = roleOf(fromId, member);
+  const caption = startCaption(s.freeDownloads, s.requiredChannel, role);
+  const keys = await keysFor(fromId, member);
+  const origin = (process.env.BARQ_PUBLIC_ORIGIN || process.env.PUBLIC_ORIGIN || "https://abdulrhman.ai").replace(/\/$/, "");
+  try {
+    await telegram.sendAnimationUrl(chatId, `${origin}/bot-intro.mp4`, {
+      caption,
+      reply_markup: keys,
+    });
+  } catch {
+    try {
+      await telegram.sendPhotoUrl(chatId, `${origin}/brand-mark.jpg`, {
+        caption,
+        reply_markup: keys,
+      });
+    } catch {
+      await telegram.sendMessage(chatId, caption, { reply_markup: keys });
+    }
+  }
   const { getGrowth } = await import("./growth.server");
   const growth = await getGrowth(fromId).catch(() => null);
   if (growth && growth.onboarding_step >= 0) {
     const sql = await (await import("@/lib/db")).getSql();
     await sql`update user_stats set onboarding_step = -1 where tg_id = ${String(fromId)}`.catch(() => undefined);
-  }
-  const caption = startCaption(s.freeDownloads, s.requiredChannel, role);
-  const keys = await keysFor(fromId, member);
-  try {
-    await telegram.sendPhotoUrl(chatId, "https://abdulrhman.ai/brand-mark.jpg", {
-      caption,
-      reply_markup: keys,
-    });
-  } catch {
-    await telegram.sendMessage(chatId, caption, { reply_markup: keys });
   }
 }
 
@@ -1351,7 +1359,7 @@ async function handleCallback(cb: TgCallbackQuery) {
   if (data === "fx:cut") {
     await telegram.answerCallback(cb.id);
     setAwait(fromId, "clip_range");
-    await telegram.sendMessage(targetChat, "اكتب مدى القص مثل 00:12-00:35\nأقصى مدة 3 دقائق.");
+    await telegram.sendMessage(targetChat, "✂️ اكتب مدى القص مثل 00:12-00:35\nأقصى مدة 3 دقائق.");
     return;
   }
   if (data === "fx:post") {
@@ -1375,7 +1383,7 @@ async function handleCallback(cb: TgCallbackQuery) {
     const { listSaves } = await import("./file-actions.server");
     const rows = await listSaves(fromId).catch(() => []);
     if (!rows.length) {
-      await telegram.sendMessage(targetChat, "محفوظاتك فاضية. بعد التحميل اضغط احفظ.");
+      await telegram.sendMessage(targetChat, "📭 محفوظاتك فاضية. بعد التحميل اضغط احفظ.");
       return;
     }
     await telegram.sendMessage(targetChat, "محفوظاتك", {
@@ -1736,7 +1744,7 @@ async function handleDownload(
       return;
     }
     busy.add(chatId);
-    const status = await telegram.sendMessage(chatId, "أفحص الرابط", {
+    const status = await telegram.sendMessage(chatId, "⚡️ أفحص الرابط", {
       reply_markup: inlineKeyboard([[{ text: "إلغاء", callback_data: `job:cancel:${job.id}` }]]),
     });
     await setJobStatusMessage(job.id, status.message_id).catch(() => undefined);
@@ -2508,14 +2516,14 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   }
 
   if (text === "⚡ حمّل رابط" || text === "حمّل رابط") {
-    await telegram.sendMessage(chatId, "أرسل رابط المقطع هنا.", { reply_markup: await keysFor(fromId, member) });
+    await telegram.sendMessage(chatId, "⚡ أرسل رابط المقطع هنا.", { reply_markup: await keysFor(fromId, member) });
     return;
   }
   if (text === "🔖 محفوظاتي" || text === "محفوظاتي") {
     const { listSaves } = await import("./file-actions.server");
     const rows = await listSaves(fromId).catch(() => []);
     if (!rows.length) {
-      await telegram.sendMessage(chatId, "محفوظاتك فاضية. بعد التحميل اضغط احفظ.");
+      await telegram.sendMessage(chatId, "📭 محفوظاتك فاضية. بعد التحميل اضغط احفظ.");
       return;
     }
     await telegram.sendMessage(chatId, "محفوظاتك", {
@@ -2530,7 +2538,7 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
       const { clipLastVideo } = await import("./file-actions.server");
       const blob = await clipLastVideo(fromId, text);
       await sendVideoFile(chatId, blob, "clip.mp4", {});
-      await telegram.sendMessage(chatId, "تم القص.");
+      await telegram.sendMessage(chatId, "✂️ تم القص.");
     } catch (err) {
       await telegram.sendMessage(chatId, err instanceof Error ? err.message : "تعذر القص.");
     }
@@ -2561,6 +2569,11 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   }
 
   for (let i = 0; i < urls.length; i += 1) {
+    if (i === 0) {
+      void telegram.react(chatId, msg.message_id);
+      void telegram.sendChatAction(chatId, "upload_video");
+      void import("../media/ytdlp").then((m) => m.ensureYtDlp()).catch(() => undefined);
+    }
     await handleDownload(chatId, fromId, urls[i]!, member, i === 0 ? updateId : undefined);
   }
 }

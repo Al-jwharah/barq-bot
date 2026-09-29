@@ -8,12 +8,12 @@ export function stageProgress(stage: "safe" | "extract" | "preview" | "upload" |
   const map = { safe: 1, extract: 2, preview: 3, upload: 4, done: 5 } as const;
   const label =
     stage === "safe" || stage === "extract"
-      ? "أفحص الرابط"
+      ? "⚡️ أفحص الرابط"
       : stage === "preview"
-        ? "أحمّل الملف"
+        ? "⚡️⚡️ أحمّل الملف"
         : stage === "upload"
-          ? "أجهّزه لتيليجرام"
-          : "تم";
+          ? "⚡️⚡️⚡️ أجهّزه لتيليجرام"
+          : "✅ تم";
   return { pct: map[stage], bar: "", label };
 }
 

@@ -16,10 +16,10 @@ import { userFailMessage } from "../jobs/retry-policy.ts";
 import { PRO_PLAN, SEASON_PLAN, starsForSar } from "./plans.ts";
 
 test("progress stages have no invented percent", () => {
-  assert.equal(stageProgress("extract").label, "أفحص الرابط");
-  assert.equal(stageProgress("preview").label, "أحمّل الملف");
-  assert.equal(stageProgress("upload").label, "أجهّزه لتيليجرام");
-  assert.equal(stageProgress("done").label, "تم");
+  assert.equal(stageProgress("extract").label, "⚡️ أفحص الرابط");
+  assert.equal(stageProgress("preview").label, "⚡️⚡️ أحمّل الملف");
+  assert.equal(stageProgress("upload").label, "⚡️⚡️⚡️ أجهّزه لتيليجرام");
+  assert.equal(stageProgress("done").label, "✅ تم");
   assert.doesNotMatch(progressStatus("extract"), /%/);
 });
 
