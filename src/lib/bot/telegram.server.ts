@@ -241,11 +241,19 @@ export const telegram = {
     call("setChatTitle", { chat_id: chatId, title }, 10000),
   setChatDescription: (chatId: string | number, description: string) =>
     call("setChatDescription", { chat_id: chatId, description }, 10000),
-  setMyName: (name: string) => call("setMyName", { name }, 10000).catch(() => undefined),
-  setMyDescription: (description: string) =>
-    call("setMyDescription", { description }, 10000).catch(() => undefined),
-  setMyShortDescription: (short_description: string) =>
-    call("setMyShortDescription", { short_description }, 10000).catch(() => undefined),
+  setMyName: (name: string) => call("setMyName", { name }, 10000),
+  setMyDescription: (description: string, language_code?: string) =>
+    call(
+      "setMyDescription",
+      language_code ? { description, language_code } : { description },
+      10000,
+    ),
+  setMyShortDescription: (short_description: string, language_code?: string) =>
+    call(
+      "setMyShortDescription",
+      language_code ? { short_description, language_code } : { short_description },
+      10000,
+    ),
   setMyCommands: (
     commands: Array<{ command: string; description: string }>,
     scope?: Record<string, unknown>,
@@ -389,7 +397,7 @@ export async function setMyProfilePhoto(blob: Blob, filename = "logo.jpg") {
 
 export async function setMyAnimatedProfilePhoto(blob: Blob, filename = "intro.mp4") {
   const form = new FormData();
-  form.set("photo", JSON.stringify({ type: "animated", animation: "attach://anim" }));
+  form.set("photo", JSON.stringify({ type: "animated", animation: "attach://anim", main_frame_timestamp: 0.4 }));
   form.set("anim", blob, filename);
   const res = await fetch(`${TELEGRAM_API}/setMyProfilePhoto`, { method: "POST", body: form });
   const json = (await res.json()) as { ok: boolean; description?: string };

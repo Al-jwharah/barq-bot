@@ -763,11 +763,8 @@ async function sendStart(chatId: number, member: Member) {
     return;
   }
   const fromId = Number(member.tg_id);
-  if (isOwnerId(fromId) || isOwnerId(chatId)) {
-    if (inGrokMode(fromId)) await exitGrokMode(chatId, fromId);
-    await sendOwnerPanel(chatId);
-    return;
-  }
+  const ownerView = isOwnerId(fromId) || isOwnerId(chatId);
+  if (ownerView && inGrokMode(fromId)) await exitGrokMode(chatId, fromId);
   const s = await botSettings();
   const role = roleOf(fromId, member);
   const caption = startCaption(s.freeDownloads, s.requiredChannel, role);
@@ -778,7 +775,8 @@ async function sendStart(chatId: number, member: Member) {
       caption,
       reply_markup: keys,
     });
-  } catch {
+  } catch (err) {
+    console.error("barq welcome", err instanceof Error ? err.message : err);
     try {
       await telegram.sendPhotoUrl(chatId, `${origin}/brand-mark.jpg`, {
         caption,
@@ -787,6 +785,10 @@ async function sendStart(chatId: number, member: Member) {
     } catch {
       await telegram.sendMessage(chatId, caption, { reply_markup: keys });
     }
+  }
+  if (ownerView) {
+    await sendOwnerPanel(chatId).catch(() => undefined);
+    return;
   }
   const { getGrowth } = await import("./growth.server");
   const growth = await getGrowth(fromId).catch(() => null);
@@ -2127,6 +2129,12 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
   }
 
   if (owner) {
+    if (text.startsWith("/start") || text === "القائمة" || text === "بدء") {
+      clearAwait(fromId);
+      if (inGrokMode(fromId)) await exitGrokMode(chatId, fromId);
+      await sendStart(chatId, member);
+      return;
+    }
     if (text.startsWith("/watch") || text === "المراقبة") {
       await sendWatch(chatId, fromId);
       return;

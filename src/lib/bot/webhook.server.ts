@@ -9,12 +9,47 @@ import {
   OWNER_IDS,
   webhookSecret,
 } from "./config.server";
-import { getPublicOrigin, publicUrl, webhookUrl } from "./origin";
+import { getPublicOrigin, webhookUrl } from "./origin";
 import { getBotState, patchBotState } from "./state";
 import { adminStats, ensurePaidGiftCodes, getSettings, grantDays, markAdmin, setSetting } from "./store.server";
 import { ensureBotCommands, setMyAnimatedProfilePhoto, telegram } from "./telegram.server";
 
-const g = globalThis as unknown as { __barqWebhookKey?: string; __barqIntroPhoto?: boolean };
+const g = globalThis as unknown as { __barqWebhookKey?: string; __barqProfileRev?: string };
+const PROFILE_REV = "bolt-ar-4";
+
+async function refreshPublicProfile(): Promise<void> {
+  if (g.__barqProfileRev === PROFILE_REV) return;
+  const errors: string[] = [];
+  await telegram.setMyName(BOT_DISPLAY_NAME).catch((err) => {
+    errors.push(err instanceof Error ? err.message : "name");
+  });
+  for (const language_code of [undefined, "ar"] as const) {
+    await telegram.setMyDescription(BOT_DESCRIPTION, language_code).catch((err) => {
+      errors.push(err instanceof Error ? err.message : "description");
+    });
+    await telegram.setMyShortDescription(BOT_SHORT, language_code).catch((err) => {
+      errors.push(err instanceof Error ? err.message : "short");
+    });
+  }
+  const origin = (getPublicOrigin() || "https://abdulrhman.ai").replace(/\/$/, "");
+  try {
+    const anim = await fetch(`${origin}/bot-intro.mp4`);
+    if (!anim.ok) throw new Error(`intro ${anim.status}`);
+    await setMyAnimatedProfilePhoto(await anim.blob(), "bot-intro.mp4");
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : "photo");
+    try {
+      const still = await fetch(`${origin}/brand-mark.jpg`);
+      if (!still.ok) throw new Error(`mark ${still.status}`);
+      const { setMyProfilePhoto } = await import("./telegram.server");
+      await setMyProfilePhoto(await still.blob(), "brand-mark.jpg");
+    } catch (stillErr) {
+      errors.push(stillErr instanceof Error ? stillErr.message : "still");
+    }
+  }
+  if (errors.length) console.error(`barq profile: ${errors.join(" | ")}`);
+  else g.__barqProfileRev = PROFILE_REV;
+}
 
 export async function ensureWebhook(url = webhookUrl()): Promise<string> {
   const secret = webhookSecret();
@@ -23,28 +58,26 @@ export async function ensureWebhook(url = webhookUrl()): Promise<string> {
   }
   const fp = createHash("sha256").update(secret, "utf8").digest("hex").slice(0, 12);
   const key = `${url}#${fp}`;
-  if (g.__barqWebhookKey === key) return url;
-  await telegram.setWebhook(url, secret);
-  g.__barqWebhookKey = key;
-  void import("./vault.server")
-    .then((m) => {
-      void m.rememberVaultChat("-1003973499061", "برق ⚡️ | سري");
-      return m.probeAndBindVault();
-    })
-    .catch(() => undefined);
-  await telegram.setMyName(BOT_DISPLAY_NAME).catch(() => undefined);
-  await telegram.setMyDescription(BOT_DESCRIPTION).catch(() => undefined);
-  await telegram.setMyShortDescription(BOT_SHORT).catch(() => undefined);
-  if (!g.__barqIntroPhoto) {
-    g.__barqIntroPhoto = true;
-    void fetch(publicUrl("/bot-intro.mp4"))
-      .then(async (res) => {
-        if (!res.ok) return;
-        await setMyAnimatedProfilePhoto(await res.blob(), "bot-intro.mp4");
+  if (g.__barqWebhookKey !== key) {
+    await telegram.setWebhook(url, secret);
+    g.__barqWebhookKey = key;
+    void import("./vault.server")
+      .then((m) => {
+        void m.rememberVaultChat("-1003973499061", "برق ⚡️ | سري");
+        return m.probeAndBindVault();
       })
       .catch(() => undefined);
+    try {
+      await setSetting("webhook_url", url);
+      await setSetting("public_origin", getPublicOrigin());
+    } catch {
+      /* db not ready yet */
+    }
   }
-  await ensureBotCommands().catch(() => undefined);
+  await refreshPublicProfile();
+  await ensureBotCommands().catch((err) => {
+    console.error("barq commands", err instanceof Error ? err.message : err);
+  });
   patchBotState({
     running: true,
     mode: "webhook",
