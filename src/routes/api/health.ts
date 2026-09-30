@@ -40,9 +40,9 @@ export const Route = createFileRoute("/api/health")({
         else if (queue.oldestProcessingSeconds >= WORKER_STUCK_SECONDS) workerCheck = "down";
         else workerCheck = "ok";
 
-        const storageOk = Boolean(
-          typeof process !== "undefined" && process.env.BLOB_READ_WRITE_TOKEN?.trim(),
-        );
+        // Token present is not enough — suspended stores still set BLOB_READ_WRITE_TOKEN.
+        const { probeBlobStoreOk } = await import("@/lib/bot/blob-status.server");
+        const storageOk = await probeBlobStoreOk();
 
         let telegramCheck: OkDown = secrets.telegram ? "ok" : "down";
         let webhookOk = false;

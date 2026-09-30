@@ -1,57 +1,49 @@
 # قائمة إنتاج برق ⚡️
 
-لا تُعلن الجاهزية حتى تكون كل البنود خضراء.
+لا تُعلن الجاهزية حتى تُغلق البنود الحمراء. المنسّق ينشر مرة واحدة — **لا تنشر من هذا الفرع.**
 
-## قبل الفتح للجمهور
+## أخضر بعد هذه الدفعة (كود / إعداد موثّق)
 
-- [x] `BARQ_PUBLIC_ORIGIN=https://barq.abdulrhman.ai` (النطاق العامل الآن — لا تقطع إلى الجذر حتى يثبت SSL، انظر RUNBOOK §7)
-- [ ] Apex SSL `https://abdulrhman.ai` — **لم يُنفَّذ القطع**
-- [x] `TELEGRAM_WEBHOOK_SECRET` في Vercel
-- [x] `TELEGRAM_BOT_TOKEN` في Vercel
-- [x] `XAI_API_KEY` في Vercel
-- [x] `BARQ_ADMIN_PIN` في Vercel
-- [x] `BLOB_READ_WRITE_TOKEN` في Vercel
-- [x] `DATABASE_URL` Postgres مُدار (Neon) في Production / Preview / Development
-- [x] `BARQ_REQUIRE_POSTGRES=true` في Production فقط بعد نجاح الاتصال
-- [x] Migrations `0002`…`0020` مطبّقة على Postgres
-- [ ] `BARQ_MAINTENANCE=off` عندما تريد التحميل
-- [ ] لا أسرار في المستودع (`npm test` يشمل secrets.test)
-- [x] `GET /api/health` → `ready: true` وقاعدة البيانات Postgres لا PGlite (الشكل: `status/live/ready/checks/postgres`)
-- [ ] Webhook = `$BARQ_PUBLIC_ORIGIN/api/telegram`
-- [ ] نسخة احتياطية: `GET /api/backup` بعد تسجيل الدخول في `/admin`
-- [ ] استعادة على قاعدة ثانية: **NOT PROVEN** — انظر `RESTORE_TEST_REPORT.md`
-- [x] تنظيف: `CLEANUP_ENABLED=true` · `FILE_RETENTION_DAYS=7` · `TEMP_FILE_RETENTION_HOURS=6` · `LOG_RETENTION_DAYS=30`
-- [ ] قناة `@barq_all`: لا تُعلن الربط بدون `message_id` حقيقي
+- [x] حماية `/api/keep` و `/api/jobs` عبر `authorizeJobRequest` (`x-barq-job` / `?secret=` / body / Bearer). GET بلا سر → `{ ok: true }` بلا إحصاءات.
+- [x] `CRON_SECRET`: Bearer مقبول على keep/jobs مع أو بدل `BARQ_JOB_SECRET`. عيّن الاثنين في Vercel (يفضّل نفس القيمة).
+- [x] مسار serverless للطابور: webhook → reclaim + drain؛ enqueue → `kickJobWorker`؛ `/api/jobs` self-kick (عمق ≤ 1 + تأخير قصير/jitter، ميزانية drain≈5، 503 عند تشبّع DB)؛ `/api/keep` يوميًا reclaim+drain(8) ثم kick إن بقي `pending`.
+- [x] تنبيه تشغيل: `runOpsAlerts` إذا `pending >= 5` أو مهمة عالقة / فشل يومي (من keep).
+- [x] Soft launch: `BARQ_LAUNCH_MAX` افتراضي **500**؛ `BARQ_TEMP_FREE=on`؛ `/start` بلا اعتذار صيانة؛ لوحة FREE مختصرة قبل أول تحميل.
+- [x] استعادة: dry-run محسّن — **استعادة حية على قاعدة ثانية: PROVEN** (انظر `RESTORE_PROOF.md`).
+- [x] `BARQ_PUBLIC_ORIGIN=https://barq.abdulrhman.ai` (لا تقطع إلى الـ apex قبل إثبات SSL).
+- [x] أسرار Vercel الحاضرة بالاسم: `TELEGRAM_BOT_TOKEN`, webhook secret, XAI, admin pin/hash, Blob, `DATABASE_URL`, `BARQ_REQUIRE_POSTGRES` على Production بعد نجاح الاتصال.
+- [x] تنظيف: `CLEANUP_ENABLED` + احتفاظ الملفات/المؤقت/السجلات.
 
-## Postgres
+## أحمر — حواجز إطلاق حقيقية
 
-لا تفعّل `BARQ_REQUIRE_POSTGRES=true` قبل ضبط `DATABASE_URL` واختبار القراءة/الكتابة والمعاملات.
+- [ ] **عامل دائم (always-on worker)** — **مطلوب لحركة فيروسية**. غير منشور؛ الاعتماد على Vercel `waitUntil` + self-kick المخفّف. لا يكفي لحمل فيروسي حتى مع تخفيف kick-storm.
+- [ ] **حمل متوازي على `/api/jobs`** — ما زال يُقيّد الإطلاق الواسع. تخفيف kick-storm منشور (ميزانية ≈5، self-kick×1+jitter قصير، cooldown reclaim، pool≈4، 503 على EMAXCONNSESSION). إعادة فحص خفيف ×5/×10 بعد النشر؛ موجات 25/50 السابقة فشلت بـ HTTP 500.
+- [ ] **Webhook** = `$BARQ_PUBLIC_ORIGIN/api/telegram` — أكّد `getWebhookInfo` بعد آخر نشر.
+- [ ] **`BARQ_MAINTENANCE=off`** عند فتح التحميل (الكود افتراضيًا off؛ تأكد من Vercel). **لا تُغيّر من هذا الفرع دون طلب صريح.**
+- [ ] **مقاعد Soft beta**: اضبط `BARQ_LAUNCH_MAX` في لوحة Vercel (500–1000) عند التوسيع — لا تغيّر أسرار Vercel من المستودع.
+- [ ] **Apex SSL** `https://abdulrhman.ai` — القطع **لم يُنفَّذ**.
+- [x] **نسخة احتياطية حية + استعادة على قاعدة ثانية**: **PROVEN** (وكيل آخر؛ `RESTORE_PROOF.md` / `RESTORE_TEST_REPORT.md`).
+- [ ] **قناة التحديثات**: لا تعلن الربط بدون `message_id` حقيقي.
+- [ ] Neon claimable: اربط القاعدة خلال مهلة المطالبة إن لزم.
 
-بعد التفعيل: التطبيق يرفض تشغيل الإنتاج بدون Postgres (`DATABASE_URL required`). المعاينة المحلية تبقى على PGlite إن لم يُضبط الرابط.
+## سياسة محتوى (قفل)
 
-قاعدة Neon الحالية claimable — يجب ربطها بحساب Neon عبر رابط المطالبة خلال 72 ساعة وإلا تُحذف.
+- **لا تُعِد تفعيل فلاتر الموسيقى/الإباحية** في هذه الدفعة. ميزات جديدة مسموحة. **ممنوع طباعة الأسرار.**
 
-## اختبار تليجرام الحقيقي
+## Cron / الخطة
 
-1. `/start` → بطاقات أول استخدام
-2. إرسال رابط ديني/مضحك بلا موسيقى → طابور → ملف
-3. `حالة برق` → حالة التحميل والذكاء والطابور
-4. رسالة لـ Barq AI
-5. تقييم ⭐ بعد أول تحميل
-6. أغنية تُرفض باعتذار — إباحي يحظر
-7. `/unban USER_ID` يفك الحظر
-8. لوحة `/admin` تبويب النمو: DAU و D1/D7/D30 والطابور
+- `vercel.json`: `/api/keep` @ `0 4 * * *` (يومي).
+- **Hobby lock:** المشروع على فريق Hobby. Hobby = cron يومي فقط — لا ترفع التكرار.
+- فريق Pro `abdulrhman-app`: **لا يوجد مشروع barq** (تحقق 2026-09-22). **لا تُرحّل** دون دليل ملكية/مشروع قائم.
 
-## الطابور
+## الطابور (ملخص)
 
-الويبهوك يُنشئ `download_jobs` ويستدعي `/api/jobs` في عزل منفصل.
-إن فشل النداء يُعالج محليًا كاحتياط.
-المهام العالقة أكثر من 3 دقائق تُعاد إلى `pending`.
-`/api/keep` يفرّغ الانتظار يوميًا ويستدعي التنظيف.
+1. Webhook: `drainJobs` أولاً ثم `reclaimStuckJobs` (cooldown) ثم `kickJobWorker` إن بقي pending.
+2. `/api/jobs`: reclaim (عمق 0 فقط + cooldown) + drain (≈5، `JOBS_DRAIN_BUDGET`) + self-kick واحد سريع (`x-barq-kick-depth` ≤ 1)؛ تشبّع DB → 503 + Retry-After.
+3. `/api/keep` (يومي / يدوي بمصادقة): reclaim + drain (8، مهلة ~28s) + kick إن بقي pending + تنظيف/تنبيهات.
 
-## المراقبة
+## مراقبة
 
-`/api/health` يعرض `status` (`live`/`ready`/`degraded`/`down`) و `live`/`ready` و `checks` و `postgres`.
-لا قيم env ولا توكنات في JSON العام.
-`/admin` → الطابور والنمو.
-JSON logs: `requestId, jobId, userId, event, durationMs, status, errorCode` مع حجب الأسرار.
+`GET /api/health` → status/live/ready/checks/postgres بلا أسرار.  
+`/admin` → الطابور والنمو.  
+JSON logs: requestId/jobId/userId/event/durationMs/status/errorCode مع حجب الأسرار.

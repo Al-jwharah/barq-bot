@@ -1,4 +1,5 @@
 import { decideHostfile } from "./handle-guards";
+import { isShortLinkIntent } from "./short-intent";
 
 export type Intent =
   | "download"
@@ -15,16 +16,20 @@ export type Intent =
   | "other";
 
 const START = new Set(["/start", "القائمة", "بدء"]);
-const AI = new Set(["barq ai", "/ai", "جروك", "/grok", "لخّصه", "لخصه", "كابشن", "تلخيص", "تحليل الفيديو", "تجهيز للنشر"]);
+const AI = new Set(["barq ai", "برق ai", "/ai", "جروك", "/grok", "لخّصه", "لخصه", "كابشن", "تلخيص", "تحليل الفيديو", "تجهيز للنشر"]);
 const LIVE = new Set(["/live", "البث", "live recorder"]);
 const ACCOUNT = new Set(["حسابي", "/account", "سجلي", "/history", "سجل التحميل"]);
 const POINTS = new Set(["نقاطي", "/points"]);
 const SUB = new Set(["الاشتراك", "اشترك الآن", "تجديد الاشتراك", "/sub", "حالة الاشتراك"]);
-const SHORT = new Set(["رابط مؤقت", "🔗 رابط مؤقت", "رابط مختصر 24س", "اشغله", "/short"]);
 const HELP = new Set(["كيف يعمل", "/help"]);
 
 function norm(text: string): string {
   return text.trim().toLowerCase();
+}
+
+/** True for reply-keyboard / slash aliases that start the short-link flow. */
+export function isShortCommand(text: string): boolean {
+  return isShortLinkIntent(text);
 }
 
 export function classifyIntent(input: {
@@ -43,12 +48,12 @@ export function classifyIntent(input: {
   if (input.urls.length > 0) return "download";
   if (input.hasFile) return "upload";
   if ([...START].some((s) => n === s.toLowerCase() || n.startsWith("/start"))) return "start";
-  if (n.startsWith("/ai") || AI.has(n)) return "ai";
+  if (n.startsWith("/ai") || n.startsWith("/grok") || AI.has(n)) return "ai";
   if (n.startsWith("/live") || LIVE.has(n)) return "live";
   if (n.startsWith("/account") || n.startsWith("/history") || ACCOUNT.has(n)) return "account";
   if (n.startsWith("/points") || POINTS.has(n)) return "points";
   if (n.startsWith("/sub") || SUB.has(n)) return "subscription";
-  if (n.startsWith("/short") || SHORT.has(n)) return "short";
+  if (isShortCommand(text)) return "short";
   if (n.startsWith("/help") || HELP.has(n)) return "help";
   if (n.startsWith("/")) return "command";
   return "other";

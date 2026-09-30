@@ -14,6 +14,11 @@ import {
 } from "./check-auth-invariant.mjs";
 import { projectRoot } from "./with-app-env.mjs";
 
+import { existsSync as __exists } from "node:fs";
+import { fileURLToPath as __f2p } from "node:url";
+/** .grok/app-env.json is gitignored; skip in a plain clone. */
+const NO_APP_ENV = !__exists(__f2p(new URL("../.grok/app-env.json", import.meta.url))) && "no .grok/app-env.json in this checkout";
+
 /**
  * The JSON body `/__app-env` would serve. Do not start a real Vite server —
  * `import { createServer } from "vite"` loads rolldown native bindings that
@@ -90,7 +95,7 @@ test("only a divergence warns the smoke verdict", () => {
   }
 });
 
-test("the build side resolves the template's shipped app-env", () => {
+test("the build side resolves the template's shipped app-env", { skip: NO_APP_ENV }, () => {
   assert.equal(buildAuthEnabled(projectRoot(), {}), false);
   assert.equal(buildAuthEnabled(projectRoot(), { VITE_AUTH_ENABLED: "true" }), true);
 });

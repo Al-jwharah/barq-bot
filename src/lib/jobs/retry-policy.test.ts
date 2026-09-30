@@ -66,6 +66,6 @@ test("user messages never include a stack trace", () => {
   assert.equal(userFailMessage("HTTP 429").includes("كثيرة"), false);
   assert.equal(userRetryMessage(1, 3).includes("مشغولة"), false);
   assert.equal(userFailMessage("too many redirects").includes("المصدر"), false);
-  assert.match(userFailMessage("DOWNLOAD_FAILED_SPAWN"), /تعذر إرسال الملف/);
+  assert.match(userFailMessage("DOWNLOAD_FAILED_SPAWN"), /تعذر تجهيز الملف/);
   assert.match(userFailMessage("حجم الملف أكبر من الحد المسموح به."), /تليجرام/);
 });

@@ -103,11 +103,15 @@ export function setLastOwnerMedia(chatId: number, messageId: number, kind: strin
 export type LastClip = {
   url: string;
   title?: string;
+  /** Caption / description / post text from extract when available. */
+  description?: string;
   platform?: string;
   mediaUrl?: string;
   thumbnail?: string;
   kind?: string;
   fileId?: string;
+  /** Seconds, when known from extract (used by Smart Clips / subtitles). */
+  duration?: number;
 };
 
 function lastClipMap(): Map<number, LastClip> {

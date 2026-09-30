@@ -4,6 +4,12 @@ import { hasAdminSession } from "@/lib/bot/admin-session.server";
 import { logEvent, logJson } from "@/lib/bot/observability.server";
 import { backupSnapshot, restoreBackup, restoreTest } from "@/lib/bot/store.server";
 
+function countDetail(parts: Record<string, number>): string {
+  return Object.entries(parts)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" ");
+}
+
 export const Route = createFileRoute("/api/backup")({
   server: {
     handlers: {
@@ -17,13 +23,17 @@ export const Route = createFileRoute("/api/backup")({
         await logJson({ event: "backup_started", status: "ok" });
         try {
           const snap = await backupSnapshot();
-          const members = snap.members.length;
-          const codes = snap.codes.length;
-          await logEvent({
-            action: "backup_completed",
-            status: "ok",
-            detail: `dump members=${members} codes=${codes} settings=${Object.keys(snap.settings).length}`,
+          const detail = countDetail({
+            members: snap.members.length,
+            codes: snap.codes.length,
+            settings: Object.keys(snap.settings).length,
+            usage: snap.usage.length,
+            bans: snap.bans.length,
+            tickets: snap.tickets.length,
+            clips: snap.clips.length,
+            jobs: snap.jobs.length,
           });
+          await logEvent({ action: "backup_completed", status: "ok", detail: `dump ${detail}` });
           await logJson({ event: "backup_completed", status: "ok" });
           return Response.json(snap);
         } catch {
@@ -64,6 +74,10 @@ export const Route = createFileRoute("/api/backup")({
             codes: tested.codes,
             members: tested.members,
             usage: tested.usage,
+            bans: tested.bans,
+            tickets: tested.tickets,
+            clips: tested.clips,
+            jobs: tested.jobs,
           });
         }
 
@@ -75,10 +89,28 @@ export const Route = createFileRoute("/api/backup")({
           await logEvent({
             action: "backup_completed",
             status: "ok",
-            detail: `restore members=${result.members} usage=${result.usage}`,
+            detail: `restore ${countDetail({
+              members: result.members,
+              usage: result.usage,
+              codes: result.codes,
+              bans: result.bans,
+              tickets: result.tickets,
+              clips: result.clips,
+              jobs: result.jobs,
+            })}`,
           });
           await logJson({ event: "backup_completed", status: "ok" });
-          return Response.json({ ok: true, applied: true, members: result.members, usage: result.usage });
+          return Response.json({
+            ok: true,
+            applied: true,
+            members: result.members,
+            usage: result.usage,
+            codes: result.codes,
+            bans: result.bans,
+            tickets: result.tickets,
+            clips: result.clips,
+            jobs: result.jobs,
+          });
         } catch {
           await logEvent({ action: "backup_completed", status: "error", detail: "restore failed" });
           await logJson({ event: "backup_completed", status: "error", errorCode: "restore_failed" });

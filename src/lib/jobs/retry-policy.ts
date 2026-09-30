@@ -49,17 +49,26 @@ export function userFailMessage(raw: string): string {
     return "انتهت صلاحية الرابط. أرسل رابطًا جديدًا.";
   }
   if (/too large|payload too large|file size|50\s*mb|أكبر من حد|حجم الملف|oversize_host/.test(s)) {
-    return "المقطع أكبر من حد تليجرام (حوالي 50 ميغا). أرسل رابط مقطع أقصر.";
+    return "المقطع أكبر من حد تليجرام (حوالي 50 ميغا). أرسل رابط مقطع أقصر أو جرّب جودة أقل.";
   }
+  if (/blob|storage|vercel.*stor|التخزين/.test(s)) {
+    return "تخزين الملفات غير متاح مؤقتًا. أُرسل لك المقطع عبر تليجرام مباشرة إن أمكن — أعد إرسال الرابط.";
+  }
+  if (/tiktok|تيك توك/.test(s)) return "ما قدرت أحمّل من تيك توك. أرسل الرابط الكامل من التطبيق (مو مختصر).";
+  if (/instagram|إنستغرام/.test(s)) return "ما قدرت أقرأ إنستغرام. جرّب رابط منشور عام (مو خاص).";
+  if (/youtube|يوتيوب/.test(s)) return "ما قدرت أحمّل من يوتيوب. جرّب شورتس أو فيديو أقصر من ١٢ دقيقة.";
+  if (/\bx\b|twitter|إكس/.test(s)) return "تعذر قراءة هذا المقطع من إكس. أرسل الملف نفسه من التطبيق إن استمر.";
   if (/blocked|nsfw|adult/.test(s)) return "تعذر تحميل هذا المحتوى.";
-  if (/timeout|timed out|etimedout|download_timeout|aborted/.test(s)) return "انتهت مهلة المصدر. حاول لاحقًا.";
-  if (/download_failed_spawn/.test(s)) return "تعذر إرسال الملف. أعد المحاولة.";
-  if (/enoent|ffmpeg|libmp3lame|spawn/.test(s)) {
+  if (/timeout|timed out|etimedout|download_timeout|aborted/.test(s)) {
+    return "انتهت مهلة المصدر. أعد إرسال الرابط بعد قليل.";
+  }
+  if (/enoent|ffmpeg|libmp3lame/.test(s)) {
     return "تعذر تحويل المقطع الآن. أعد المحاولة بعد دقيقة.";
   }
+  if (/download_failed_spawn|spawn/.test(s)) return "تعذر تجهيز الملف على الخادم. أعد إرسال الرابط.";
   if (/(?:^|\s)429\b|rate limit/.test(s) && !/redirect/.test(s)) {
-    return "تعذر التحميل من المصدر. أعد إرسال الرابط.";
+    return "المصدر مشغول الآن. انتظر دقيقة ثم أعد إرسال الرابط.";
   }
-  if (/403|401|unauthorized|forbidden/.test(s)) return "تعذر الوصول للمصدر. جرّب رابطًا آخر.";
-  return "تعذر تجهيز المقطع. جرّب رابطًا آخر أو أعد المحاولة لاحقًا.";
+  if (/403|401|unauthorized|forbidden/.test(s)) return "المصدر رفض الوصول. جرّب رابطًا عامًا آخر.";
+  return "تعذر تجهيز هذا المقطع. أعد إرسال الرابط أو جرّب رابطًا آخر.";
 }

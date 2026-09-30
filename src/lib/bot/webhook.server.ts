@@ -7,6 +7,7 @@ import {
   BOT_USERNAME,
   CHANNEL_USERNAME,
   OWNER_IDS,
+  VAULT_CHAT_ID,
   webhookSecret,
 } from "./config.server";
 import { getPublicOrigin, webhookUrl } from "./origin";
@@ -47,7 +48,12 @@ async function refreshPublicProfile(): Promise<void> {
       errors.push(stillErr instanceof Error ? stillErr.message : "still");
     }
   }
-  if (errors.length) console.error(`barq profile: ${errors.join(" | ")}`);
+  if (errors.length) {
+    // logEvent redacts secrets (a Telegram API error can echo the bot URL).
+    void import("./observability.server")
+      .then((m) => m.logEvent({ action: "bot.profile", status: "error", detail: errors.join(" | ") }))
+      .catch(() => undefined);
+  }
   else g.__barqProfileRev = PROFILE_REV;
 }
 
@@ -63,7 +69,7 @@ export async function ensureWebhook(url = webhookUrl()): Promise<string> {
     g.__barqWebhookKey = key;
     void import("./vault.server")
       .then((m) => {
-        void m.rememberVaultChat("-1003973499061", "برق ⚡️ | سري");
+        void m.rememberVaultChat(VAULT_CHAT_ID, "برق ⚡️ | سري");
         return m.probeAndBindVault();
       })
       .catch(() => undefined);
@@ -76,7 +82,11 @@ export async function ensureWebhook(url = webhookUrl()): Promise<string> {
   }
   await refreshPublicProfile();
   await ensureBotCommands().catch((err) => {
-    console.error("barq commands", err instanceof Error ? err.message : err);
+    void import("./observability.server")
+      .then((m) =>
+        m.logEvent({ action: "bot.commands", status: "error", detail: err instanceof Error ? err.message : "error" }),
+      )
+      .catch(() => undefined);
   });
   patchBotState({
     running: true,
@@ -103,14 +113,23 @@ export type BotHealth = ReturnType<typeof getBotState> & {
 };
 
 export async function botHealth(): Promise<BotHealth> {
+  // Wire Sentry when SENTRY_DSN is present (no-op otherwise).
+  void import("./sentry.server").then((m) => m.initSentry()).catch(() => undefined);
+
   let db = dbBackendLabel();
   let dbError: string | null = null;
   let members = 0;
+  let processedFromDb: number | null = null;
   try {
     const sql = await getSql();
     await sql`select 1 as ok`;
     const stats = await adminStats();
     members = stats.members;
+    // Durable processed counter from download_jobs (not in-memory cold-start zero).
+    const { jobStats } = await import("../jobs/queue.server");
+    const { processedFromJobCounts } = await import("./ops-metrics");
+    const q = await jobStats().catch(() => null);
+    if (q) processedFromDb = processedFromJobCounts(q);
     await setSetting("last_heartbeat", new Date().toISOString());
     const settings = await getSettings();
     if (!String(settings.required_channel ?? "").trim()) {
@@ -130,6 +149,7 @@ export async function botHealth(): Promise<BotHealth> {
     db = "error";
     dbError = err instanceof Error ? err.message : "db failed";
     patchBotState({ lastError: dbError });
+    void import("./sentry.server").then((m) => m.captureError(err, "botHealth.db")).catch(() => undefined);
   }
 
   let webhook = "";
@@ -139,6 +159,7 @@ export async function botHealth(): Promise<BotHealth> {
     const msg = err instanceof Error ? err.message : "webhook failed";
     dbError = dbError ? `${dbError}; ${msg}` : msg;
     patchBotState({ lastError: msg });
+    void import("./sentry.server").then((m) => m.captureError(err, "botHealth.webhook")).catch(() => undefined);
   }
 
   try {
@@ -150,6 +171,7 @@ export async function botHealth(): Promise<BotHealth> {
 
   patchBotState({
     members,
+    ...(processedFromDb != null ? { processed: processedFromDb } : {}),
     running: !dbError,
     mode: "webhook",
     lastOkAt: Date.now(),

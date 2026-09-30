@@ -4,12 +4,12 @@ import { getMember, isSubscribed, type Member } from "./store.server";
 import { isOwnerId } from "./config.server";
 import { replyKeyboard } from "./telegram.server";
 
-export const AD_BTN = "مشاهدة إعلان لتجديد 5 فيديوهات";
+export const AD_BTN = "مشاهدة إعلان لتجديد 10 فيديوهات";
 export const SUPPORT_BTN = "دعم فني";
 
 export const OWNER_ONLY_LABELS = new Set([
   "لوحة التحكم",
-  "Barq AI",
+  "برق AI",
   "المراقبة",
   "الإحصائيات",
   "إرسال للجميع",
@@ -17,7 +17,7 @@ export const OWNER_ONLY_LABELS = new Set([
   "القناة والمجاني",
   "أخبار القناة",
   "الإعلان",
-  "إنهاء Barq AI",
+  "إنهاء برق AI",
   "إنهاء المحادثة",
   "النماذج",
   "انشر في القناة",
@@ -30,11 +30,22 @@ export const SUB_KEYBOARD = replyKeyboard([
   ["حالة الاشتراك", SUPPORT_BTN],
 ]);
 
+export function subKeyboard() {
+  return SUB_KEYBOARD;
+}
+
 export const FREE_KEYBOARD = replyKeyboard([
   ["⚡ حمّل رابط", "🔖 محفوظاتي"],
   ["🔗 رابط مؤقت"],
   ["❔ المساعدة"],
 ]);
+
+/** Kept for v2 callers — the simple keyboard is the product default now. */
+export function freeKeyboardFull() {
+  return FREE_KEYBOARD;
+}
+
+export const FREE_KEYBOARD_FULL = FREE_KEYBOARD;
 
 export type UserRole = "owner" | "admin" | "moderator" | "support" | "sub" | "free";
 
@@ -46,8 +57,14 @@ export function roleOf(fromId: number, member?: Member | null): UserRole {
   return "free";
 }
 
+export function freeKeyboardFor(member?: Member | null) {
+  if ((member?.downloads_used ?? 0) > 0) return freeKeyboardFull();
+  return FREE_KEYBOARD;
+}
+
 export async function keysFor(fromId: number, member?: Member | null) {
-  const role = roleOf(fromId, member ?? (await getMember(fromId)));
+  const resolved = member ?? (await getMember(fromId));
+  const role = roleOf(fromId, resolved);
   if (role === "owner" && inGrokMode(fromId)) return GROK_KEYBOARD;
   if (role === "owner") return OWNER_KEYBOARD;
   if (role === "admin") return replyKeyboard([["لوحة التحكم", "/jobs"], ["/tickets", "كيف يعمل"]]);
@@ -60,5 +77,5 @@ export async function keysFor(fromId: number, member?: Member | null) {
   }
   if (role === "support") return replyKeyboard([["/tickets", "كيف يعمل"]]);
   if (role === "sub") return SUB_KEYBOARD;
-  return FREE_KEYBOARD;
+  return freeKeyboardFor(resolved);
 }

@@ -15,8 +15,13 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as FacebookRouteImport } from './routes/facebook'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as InstagramRouteImport } from './routes/instagram'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LegalRouteImport } from './routes/legal'
+import { Route as LibraryRouteImport } from './routes/library'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SnapchatRouteImport } from './routes/snapchat'
@@ -25,17 +30,23 @@ import { Route as TiktokRouteImport } from './routes/tiktok'
 import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as XRouteImport } from './routes/x'
 import { Route as YoutubeRouteImport } from './routes/youtube'
+import { Route as ApiAdsRouteImport } from './routes/api/ads'
+import { Route as ApiAiPlaygroundRouteImport } from './routes/api/ai-playground'
 import { Route as ApiBackupRouteImport } from './routes/api/backup'
 import { Route as ApiFileRouteImport } from './routes/api/file'
 import { Route as ApiGrabRouteImport } from './routes/api/grab'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiJobsRouteImport } from './routes/api/jobs'
 import { Route as ApiKeepRouteImport } from './routes/api/keep'
+import { Route as ApiLeaderboardRouteImport } from './routes/api/leaderboard'
 import { Route as ApiPartnerRouteImport } from './routes/api/partner'
+import { Route as ApiPreviewRouteImport } from './routes/api/preview'
+import { Route as ApiPricingFlagsRouteImport } from './routes/api/pricing-flags'
 import { Route as ApiRemindRouteImport } from './routes/api/remind'
 import { Route as ApiResolveRouteImport } from './routes/api/resolve'
 import { Route as ApiStatusRouteImport } from './routes/api/status'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as ApiTelegramAuthRouteImport } from './routes/api/telegram-auth'
 import { Route as DIdRouteImport } from './routes/d.$id'
 import { Route as DlIdRouteImport } from './routes/dl.$id'
 import { Route as SIdRouteImport } from './routes/s.$id'
@@ -71,14 +82,39 @@ const InstagramRoute = InstagramRouteImport.update({
   path: '/instagram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LegalRoute = LegalRouteImport.update({
   id: '/legal',
   path: '/legal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -121,6 +157,16 @@ const YoutubeRoute = YoutubeRouteImport.update({
   path: '/youtube',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdsRoute = ApiAdsRouteImport.update({
+  id: '/api/ads',
+  path: '/api/ads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiPlaygroundRoute = ApiAiPlaygroundRouteImport.update({
+  id: '/api/ai-playground',
+  path: '/api/ai-playground',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBackupRoute = ApiBackupRouteImport.update({
   id: '/api/backup',
   path: '/api/backup',
@@ -151,9 +197,24 @@ const ApiKeepRoute = ApiKeepRouteImport.update({
   path: '/api/keep',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeaderboardRoute = ApiLeaderboardRouteImport.update({
+  id: '/api/leaderboard',
+  path: '/api/leaderboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPartnerRoute = ApiPartnerRouteImport.update({
   id: '/api/partner',
   path: '/api/partner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPreviewRoute = ApiPreviewRouteImport.update({
+  id: '/api/preview',
+  path: '/api/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPricingFlagsRoute = ApiPricingFlagsRouteImport.update({
+  id: '/api/pricing-flags',
+  path: '/api/pricing-flags',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRemindRoute = ApiRemindRouteImport.update({
@@ -174,6 +235,11 @@ const ApiStatusRoute = ApiStatusRouteImport.update({
 const ApiTelegramRoute = ApiTelegramRouteImport.update({
   id: '/api/telegram',
   path: '/api/telegram',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramAuthRoute = ApiTelegramAuthRouteImport.update({
+  id: '/api/telegram-auth',
+  path: '/api/telegram-auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DIdRoute = DIdRouteImport.update({
@@ -204,8 +270,13 @@ export interface FileRoutesByFullPath {
   '/facebook': typeof FacebookRoute
   '/faq': typeof FaqRoute
   '/instagram': typeof InstagramRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/legal': typeof LegalRoute
+  '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/register': typeof RegisterRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/snapchat': typeof SnapchatRoute
@@ -214,17 +285,23 @@ export interface FileRoutesByFullPath {
   '/workspace': typeof WorkspaceRoute
   '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
+  '/api/ads': typeof ApiAdsRoute
+  '/api/ai-playground': typeof ApiAiPlaygroundRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
   '/api/grab': typeof ApiGrabRoute
   '/api/health': typeof ApiHealthRoute
   '/api/jobs': typeof ApiJobsRoute
   '/api/keep': typeof ApiKeepRoute
+  '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
+  '/api/preview': typeof ApiPreviewRoute
+  '/api/pricing-flags': typeof ApiPricingFlagsRoute
   '/api/remind': typeof ApiRemindRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/telegram-auth': typeof ApiTelegramAuthRoute
   '/d/$id': typeof DIdRoute
   '/dl/$id': typeof DlIdRoute
   '/s/$id': typeof SIdRoute
@@ -237,8 +314,13 @@ export interface FileRoutesByTo {
   '/facebook': typeof FacebookRoute
   '/faq': typeof FaqRoute
   '/instagram': typeof InstagramRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/legal': typeof LegalRoute
+  '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/register': typeof RegisterRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/snapchat': typeof SnapchatRoute
@@ -247,17 +329,23 @@ export interface FileRoutesByTo {
   '/workspace': typeof WorkspaceRoute
   '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
+  '/api/ads': typeof ApiAdsRoute
+  '/api/ai-playground': typeof ApiAiPlaygroundRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
   '/api/grab': typeof ApiGrabRoute
   '/api/health': typeof ApiHealthRoute
   '/api/jobs': typeof ApiJobsRoute
   '/api/keep': typeof ApiKeepRoute
+  '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
+  '/api/preview': typeof ApiPreviewRoute
+  '/api/pricing-flags': typeof ApiPricingFlagsRoute
   '/api/remind': typeof ApiRemindRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/telegram-auth': typeof ApiTelegramAuthRoute
   '/d/$id': typeof DIdRoute
   '/dl/$id': typeof DlIdRoute
   '/s/$id': typeof SIdRoute
@@ -271,8 +359,13 @@ export interface FileRoutesById {
   '/facebook': typeof FacebookRoute
   '/faq': typeof FaqRoute
   '/instagram': typeof InstagramRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/legal': typeof LegalRoute
+  '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/register': typeof RegisterRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/snapchat': typeof SnapchatRoute
@@ -281,17 +374,23 @@ export interface FileRoutesById {
   '/workspace': typeof WorkspaceRoute
   '/x': typeof XRoute
   '/youtube': typeof YoutubeRoute
+  '/api/ads': typeof ApiAdsRoute
+  '/api/ai-playground': typeof ApiAiPlaygroundRoute
   '/api/backup': typeof ApiBackupRoute
   '/api/file': typeof ApiFileRoute
   '/api/grab': typeof ApiGrabRoute
   '/api/health': typeof ApiHealthRoute
   '/api/jobs': typeof ApiJobsRoute
   '/api/keep': typeof ApiKeepRoute
+  '/api/leaderboard': typeof ApiLeaderboardRoute
   '/api/partner': typeof ApiPartnerRoute
+  '/api/preview': typeof ApiPreviewRoute
+  '/api/pricing-flags': typeof ApiPricingFlagsRoute
   '/api/remind': typeof ApiRemindRoute
   '/api/resolve': typeof ApiResolveRoute
   '/api/status': typeof ApiStatusRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/telegram-auth': typeof ApiTelegramAuthRoute
   '/d/$id': typeof DIdRoute
   '/dl/$id': typeof DlIdRoute
   '/s/$id': typeof SIdRoute
@@ -306,8 +405,13 @@ export interface FileRouteTypes {
     | '/facebook'
     | '/faq'
     | '/instagram'
+    | '/leaderboard'
     | '/legal'
+    | '/library'
+    | '/login'
+    | '/pricing'
     | '/privacy'
+    | '/register'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/snapchat'
@@ -316,17 +420,23 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/x'
     | '/youtube'
+    | '/api/ads'
+    | '/api/ai-playground'
     | '/api/backup'
     | '/api/file'
     | '/api/grab'
     | '/api/health'
     | '/api/jobs'
     | '/api/keep'
+    | '/api/leaderboard'
     | '/api/partner'
+    | '/api/preview'
+    | '/api/pricing-flags'
     | '/api/remind'
     | '/api/resolve'
     | '/api/status'
     | '/api/telegram'
+    | '/api/telegram-auth'
     | '/d/$id'
     | '/dl/$id'
     | '/s/$id'
@@ -339,8 +449,13 @@ export interface FileRouteTypes {
     | '/facebook'
     | '/faq'
     | '/instagram'
+    | '/leaderboard'
     | '/legal'
+    | '/library'
+    | '/login'
+    | '/pricing'
     | '/privacy'
+    | '/register'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/snapchat'
@@ -349,17 +464,23 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/x'
     | '/youtube'
+    | '/api/ads'
+    | '/api/ai-playground'
     | '/api/backup'
     | '/api/file'
     | '/api/grab'
     | '/api/health'
     | '/api/jobs'
     | '/api/keep'
+    | '/api/leaderboard'
     | '/api/partner'
+    | '/api/preview'
+    | '/api/pricing-flags'
     | '/api/remind'
     | '/api/resolve'
     | '/api/status'
     | '/api/telegram'
+    | '/api/telegram-auth'
     | '/d/$id'
     | '/dl/$id'
     | '/s/$id'
@@ -372,8 +493,13 @@ export interface FileRouteTypes {
     | '/facebook'
     | '/faq'
     | '/instagram'
+    | '/leaderboard'
     | '/legal'
+    | '/library'
+    | '/login'
+    | '/pricing'
     | '/privacy'
+    | '/register'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/snapchat'
@@ -382,17 +508,23 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/x'
     | '/youtube'
+    | '/api/ads'
+    | '/api/ai-playground'
     | '/api/backup'
     | '/api/file'
     | '/api/grab'
     | '/api/health'
     | '/api/jobs'
     | '/api/keep'
+    | '/api/leaderboard'
     | '/api/partner'
+    | '/api/preview'
+    | '/api/pricing-flags'
     | '/api/remind'
     | '/api/resolve'
     | '/api/status'
     | '/api/telegram'
+    | '/api/telegram-auth'
     | '/d/$id'
     | '/dl/$id'
     | '/s/$id'
@@ -406,8 +538,13 @@ export interface RootRouteChildren {
   FacebookRoute: typeof FacebookRoute
   FaqRoute: typeof FaqRoute
   InstagramRoute: typeof InstagramRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   LegalRoute: typeof LegalRoute
+  LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
+  RegisterRoute: typeof RegisterRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SnapchatRoute: typeof SnapchatRoute
@@ -416,17 +553,23 @@ export interface RootRouteChildren {
   WorkspaceRoute: typeof WorkspaceRoute
   XRoute: typeof XRoute
   YoutubeRoute: typeof YoutubeRoute
+  ApiAdsRoute: typeof ApiAdsRoute
+  ApiAiPlaygroundRoute: typeof ApiAiPlaygroundRoute
   ApiBackupRoute: typeof ApiBackupRoute
   ApiFileRoute: typeof ApiFileRoute
   ApiGrabRoute: typeof ApiGrabRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiJobsRoute: typeof ApiJobsRoute
   ApiKeepRoute: typeof ApiKeepRoute
+  ApiLeaderboardRoute: typeof ApiLeaderboardRoute
   ApiPartnerRoute: typeof ApiPartnerRoute
+  ApiPreviewRoute: typeof ApiPreviewRoute
+  ApiPricingFlagsRoute: typeof ApiPricingFlagsRoute
   ApiRemindRoute: typeof ApiRemindRoute
   ApiResolveRoute: typeof ApiResolveRoute
   ApiStatusRoute: typeof ApiStatusRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
+  ApiTelegramAuthRoute: typeof ApiTelegramAuthRoute
   DIdRoute: typeof DIdRoute
   DlIdRoute: typeof DlIdRoute
   SIdRoute: typeof SIdRoute
@@ -477,6 +620,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstagramRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/legal': {
       id: '/legal'
       path: '/legal'
@@ -484,11 +634,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LegalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -547,6 +725,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof YoutubeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ads': {
+      id: '/api/ads'
+      path: '/api/ads'
+      fullPath: '/api/ads'
+      preLoaderRoute: typeof ApiAdsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai-playground': {
+      id: '/api/ai-playground'
+      path: '/api/ai-playground'
+      fullPath: '/api/ai-playground'
+      preLoaderRoute: typeof ApiAiPlaygroundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/backup': {
       id: '/api/backup'
       path: '/api/backup'
@@ -589,11 +781,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiKeepRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/leaderboard': {
+      id: '/api/leaderboard'
+      path: '/api/leaderboard'
+      fullPath: '/api/leaderboard'
+      preLoaderRoute: typeof ApiLeaderboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/partner': {
       id: '/api/partner'
       path: '/api/partner'
       fullPath: '/api/partner'
       preLoaderRoute: typeof ApiPartnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/preview': {
+      id: '/api/preview'
+      path: '/api/preview'
+      fullPath: '/api/preview'
+      preLoaderRoute: typeof ApiPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pricing-flags': {
+      id: '/api/pricing-flags'
+      path: '/api/pricing-flags'
+      fullPath: '/api/pricing-flags'
+      preLoaderRoute: typeof ApiPricingFlagsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/remind': {
@@ -622,6 +835,13 @@ declare module '@tanstack/react-router' {
       path: '/api/telegram'
       fullPath: '/api/telegram'
       preLoaderRoute: typeof ApiTelegramRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram-auth': {
+      id: '/api/telegram-auth'
+      path: '/api/telegram-auth'
+      fullPath: '/api/telegram-auth'
+      preLoaderRoute: typeof ApiTelegramAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/d/$id': {
@@ -662,8 +882,13 @@ const rootRouteChildren: RootRouteChildren = {
   FacebookRoute: FacebookRoute,
   FaqRoute: FaqRoute,
   InstagramRoute: InstagramRoute,
+  LeaderboardRoute: LeaderboardRoute,
   LegalRoute: LegalRoute,
+  LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
+  RegisterRoute: RegisterRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SnapchatRoute: SnapchatRoute,
@@ -672,17 +897,23 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspaceRoute: WorkspaceRoute,
   XRoute: XRoute,
   YoutubeRoute: YoutubeRoute,
+  ApiAdsRoute: ApiAdsRoute,
+  ApiAiPlaygroundRoute: ApiAiPlaygroundRoute,
   ApiBackupRoute: ApiBackupRoute,
   ApiFileRoute: ApiFileRoute,
   ApiGrabRoute: ApiGrabRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiJobsRoute: ApiJobsRoute,
   ApiKeepRoute: ApiKeepRoute,
+  ApiLeaderboardRoute: ApiLeaderboardRoute,
   ApiPartnerRoute: ApiPartnerRoute,
+  ApiPreviewRoute: ApiPreviewRoute,
+  ApiPricingFlagsRoute: ApiPricingFlagsRoute,
   ApiRemindRoute: ApiRemindRoute,
   ApiResolveRoute: ApiResolveRoute,
   ApiStatusRoute: ApiStatusRoute,
   ApiTelegramRoute: ApiTelegramRoute,
+  ApiTelegramAuthRoute: ApiTelegramAuthRoute,
   DIdRoute: DIdRoute,
   DlIdRoute: DlIdRoute,
   SIdRoute: SIdRoute,

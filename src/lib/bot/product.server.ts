@@ -168,6 +168,8 @@ export async function ensureReferral(tgId: number): Promise<{ code: string; invi
 }
 
 export async function applyReferral(newUserId: number, startArg: string): Promise<boolean> {
+  const { REFERRALS_LIVE } = await import("./config.server");
+  if (!REFERRALS_LIVE) return false;
   const m = startArg.trim().match(/^ref[_-]?([a-z0-9]+)/i);
   if (!m) return false;
   const sql = await getSql();
@@ -301,7 +303,7 @@ export function launchPlanText(): string {
 
 اليوم 1: تعريف برق + فيديو تجريبي
 اليوم 2: كيف تحمّل من تيك توك/إكس
-اليوم 3: Barq AI بجملة واحدة
+اليوم 3: برق AI بجملة واحدة
 اليوم 4: مسابقة تحميل (زر شارك)
 اليوم 5: خطط بلس/برو/ماكس (بدون دفع حتى الإطلاق)
 اليوم 6: إحالة صديق = 3 تحميلات
@@ -338,7 +340,7 @@ export function previewCaption(result: ExtractResult): string {
   const dur = item?.duration ? `${Math.round(item.duration)}ث` : "";
   const sizes = (item?.variants ?? []).map((v) => v.size).filter((n): n is number => typeof n === "number" && n > 0);
   const mb = sizes.length ? `${Math.round(Math.min(...sizes) / (1024 * 1024))}–${Math.round(Math.max(...sizes) / (1024 * 1024))}MB` : "";
-  return ["جاري إرسال أعلى جودة", [dur, mb].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
+  return ["جاري الإرسال…", [dur, mb].filter(Boolean).join(" · ")].filter(Boolean).join("\n");
 }
 
 export function queueEta(position: number): string {

@@ -104,3 +104,45 @@
     animation: none;
   }
 }
+
+/* D7 — motion / funded-product polish */
+@keyframes hero-aurora-shift {
+  0% { transform: translate3d(0,0,0) scale(1); opacity: 0.55; }
+  50% { transform: translate3d(2%, -3%, 0) scale(1.08); opacity: 0.8; }
+  100% { transform: translate3d(0,0,0) scale(1); opacity: 0.55; }
+}
+
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes bolt-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 40%, transparent); }
+  50% { box-shadow: 0 0 26px 4px color-mix(in oklab, var(--color-accent) 30%, transparent); }
+}
+
+.hero-aurora {
+  background:
+    radial-gradient(40% 50% at 20% 30%, color-mix(in oklab, var(--color-accent) 35%, transparent), transparent 70%),
+    radial-gradient(45% 55% at 80% 20%, color-mix(in oklab, #7c5cff 28%, transparent), transparent 70%),
+    radial-gradient(50% 60% at 50% 80%, color-mix(in oklab, #1f6feb 22%, transparent), transparent 75%);
+  filter: blur(28px);
+  animation: hero-aurora-shift 12s var(--ease-smooth-out) infinite;
+}
+
+.card-enter {
+  animation: card-enter var(--motion-slow) var(--ease-smooth-out) both;
+}
+
+.bolt-glow {
+  animation: bolt-glow 2.4s var(--ease-smooth-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-aurora,
+  .card-enter,
+  .bolt-glow {
+    animation: none;
+  }
+}

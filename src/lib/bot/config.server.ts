@@ -5,6 +5,14 @@ const FALSE_FLAG = new Set(["0", "false", "off", "no"]);
 export const KNOWN_BOOLEAN_FLAGS = [
   "BARQ_TEMP_FREE",
   "BARQ_SUBSCRIPTIONS_LIVE",
+  "BARQ_REFERRALS_LIVE",
+  "BARQ_LEADERBOARD_LIVE",
+  "BARQ_TELEGRAM_LOGIN_ENABLED",
+  "BARQ_ADS_ENABLED",
+  "BARQ_SUBSCRIPTIONS_UI",
+  "BARQ_SHORT_LINKS_UI",
+  "BARQ_QUALITY_PICKER",
+  "BARQ_POST_DELIVERY_AI",
   "BARQ_DAILY_CAP_ON",
   "BARQ_MAINTENANCE",
   "BARQ_VAULT_ARCHIVE_ENABLED",
@@ -57,7 +65,8 @@ export const ADMIN_PIN_HASH = env("BARQ_ADMIN_PIN_HASH") ?? "";
 /** Local-dev fallback only. Never log. Production must use BARQ_ADMIN_PIN_HASH. */
 export const ADMIN_PIN = env("BARQ_ADMIN_PIN") ?? "";
 export const OWNER_TG_ID = env("BARQ_OWNER_TG_ID") ?? "8471762251";
-export const OWNER_IDS = (env("BARQ_OWNER_IDS") ?? "8471762251,5554780316")
+// BARQ_OWNER_IDS is set in Vercel; without it only the primary owner is trusted.
+export const OWNER_IDS = (env("BARQ_OWNER_IDS") ?? OWNER_TG_ID)
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -65,15 +74,32 @@ export const OWNER_IDS = (env("BARQ_OWNER_IDS") ?? "8471762251,5554780316")
 export const TEMP_FREE = envFlag("BARQ_TEMP_FREE", true);
 /** Charging the public. Keep false until the owner says launch. */
 export const SUBSCRIPTIONS_LIVE = envFlag("BARQ_SUBSCRIPTIONS_LIVE", false);
-export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 5) || 5;
+/** Invite/referral rewards. Default OFF until Squad C 48h stable window. */
+export const REFERRALS_LIVE = envFlag("BARQ_REFERRALS_LIVE", false);
+/** Weekly leaderboard page + /api/leaderboard. Default OFF until Squad C 48h stable window. */
+export const LEADERBOARD_LIVE = envFlag("BARQ_LEADERBOARD_LIVE", false);
+/** Telegram Login Widget for /library. Default OFF — needs BotFather domain + owner config. */
+export const TELEGRAM_LOGIN_ENABLED = envFlag("BARQ_TELEGRAM_LOGIN_ENABLED", false);
+/** Tasteful site ad slots. Default OFF — demo creatives stay clearly labeled when off. */
+export const ADS_ENABLED = envFlag("BARQ_ADS_ENABLED", false);
+/** Website pricing UI / Telegram deep-links. Separate from BARQ_SUBSCRIPTIONS_LIVE payments. */
+export const SUBSCRIPTIONS_UI = envFlag("BARQ_SUBSCRIPTIONS_UI", true);
+/** Advertise short-link CTAs. Default ON — soft Arabic degrade when Blob/tgfile fails. Set off to hide. */
+export const SHORT_LINKS_UI = envFlag("BARQ_SHORT_LINKS_UI", true);
+/** Quality/MP3 picker before delivery. Off = send best file straight away (faster). */
+export const QUALITY_PICKER = envFlag("BARQ_QUALITY_PICKER", false);
+/** Extra «برق AI» message after each delivered file. Off = file-only (current product). */
+export const POST_DELIVERY_AI = envFlag("BARQ_POST_DELIVERY_AI", false);
+export const DAILY_CAP = Number(env("BARQ_DAILY_CAP") ?? 10) || 10;
 export const DAILY_CAP_ON = envFlag("BARQ_DAILY_CAP_ON", true);
 export const MAINTENANCE = envFlag("BARQ_MAINTENANCE", false);
-export const LAUNCH_MAX = Number(env("BARQ_LAUNCH_MAX") ?? 100) || 100;
+/** Soft public beta seat gate. Default 500 for soft beta; raise via BARQ_LAUNCH_MAX on Vercel (e.g. 1000+) when opening wider. Do not flip Vercel secrets from this repo — set env in the dashboard. Code default applies only when the env var is unset. */
+export const LAUNCH_MAX = Number(env("BARQ_LAUNCH_MAX") ?? 500) || 500;
 export const MAINTENANCE_TEXT = `نعتذر عن البداية السيئة ⚡️
 
 البوت تحت التطوير، وسيعود للعمل بشكل جديد قريبًا.`;
 export const BARQ_AI_DAILY = Number(env("BARQ_AI_DAILY") ?? 10) || 10;
-export const FREE_DOWNLOADS = Number(env("BARQ_FREE_DOWNLOADS") ?? 5) || 5;
+export const FREE_DOWNLOADS = Number(env("BARQ_FREE_DOWNLOADS") ?? 10) || 10;
 export const MONTHLY_CAP = Number(env("BARQ_MONTHLY_CAP") ?? 30) || 30;
 export const MONTHLY_CAP_ON = envFlag("BARQ_MONTHLY_CAP_ON", true);
 export const SUB_STARS = 50;
@@ -93,7 +119,8 @@ export const AI_ENABLED = envFlag("BARQ_AI_ENABLED", true);
 export const COFFEE_ENABLED = envFlag("BARQ_COFFEE_ENABLED", true);
 export const WATERMARK_ENABLED = envFlag("BARQ_WATERMARK_ENABLED", false);
 export const LAUNCH_MODE = envFlag("BARQ_LAUNCH_MODE", true);
-export const DOWNLOAD_TIMEOUT_MS = Number(env("DOWNLOAD_TIMEOUT_MS") ?? 900000) || 900000;
+/** Vercel Hobby kills functions at 300s — stay under it (override with DOWNLOAD_TIMEOUT_MS on a worker host). */
+export const DOWNLOAD_TIMEOUT_MS = Number(env("DOWNLOAD_TIMEOUT_MS") ?? 280000) || 280000;
 export const MAX_CONCURRENT_JOBS = Number(env("MAX_CONCURRENT_JOBS") ?? 3) || 3;
 export const MAX_DOWNLOAD_SIZE_MB = Number(env("MAX_DOWNLOAD_SIZE_MB") ?? 500) || 500;
 export const FILE_RETENTION_DAYS = Number(env("FILE_RETENTION_DAYS") ?? 7) || 7;
@@ -120,9 +147,10 @@ export const DISCOUNT_USES = 1000;
 export const CHANNEL_USERNAME = "barq_all";
 export const CHANNEL_TITLE = "برق ⚡️ | التحديثات";
 export const CHANNEL_DESCRIPTION =
-  "تحديثات وأخبار ومسابقات برق. البوت @barq_ibot — ٥ تجارب مجانية بعد الانضمام. الدعم @i_2169";
+  "تحديثات وأخبار ومسابقات برق. البوت @barq_ibot — ١٠ تحميلات مجانية يوميًا بعد الانضمام. الدعم @i_2169";
 export const CHANNEL_CHAT = `@${CHANNEL_USERNAME}`;
-export const VAULT_INVITE = env("BARQ_VAULT_INVITE") ?? "https://t.me/+5X9lbwSU6fgzMDFk";
+/** Private vault invite — env only (set in Vercel); never hardcode the link. */
+export const VAULT_INVITE = env("BARQ_VAULT_INVITE") ?? "";
 export const VAULT_CHAT_ID = env("BARQ_VAULT_CHAT_ID") ?? "-1003973499061";
 
 export const SUPPORT_USERNAME = "i_2169";
@@ -140,9 +168,9 @@ export const GROK_SPEEDS = ["fast", "balanced", "thorough"] as const;
 export type GrokSpeed = (typeof GROK_SPEEDS)[number];
 
 export const GROK_MODEL_META: Record<GrokModel, { label: string; hint: string }> = {
-  "grok-4.5": { label: "Grok 4.5", hint: "الأحدث والأقوى" },
-  "grok-4": { label: "Grok 4", hint: "متوازن" },
-  "grok-3": { label: "Grok 3", hint: "خفيف وسريع" },
+  "grok-4.5": { label: "برق AI 4.5", hint: "الأحدث والأقوى" },
+  "grok-4": { label: "برق AI 4", hint: "متوازن" },
+  "grok-3": { label: "برق AI 3", hint: "خفيف وسريع" },
 };
 
 export function grokModelLabel(model: string): string {

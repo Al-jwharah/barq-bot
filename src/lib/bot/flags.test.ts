@@ -13,6 +13,7 @@ import {
   COFFEE_ENABLED,
   DAILY_CAP,
   DAILY_CAP_ON,
+  FREE_DOWNLOADS,
   DOWNLOAD_TIMEOUT_MS,
   envFlag,
   FILE_RETENTION_DAYS,
@@ -25,6 +26,10 @@ import {
   TEMP_FILE_RETENTION_HOURS,
   TEMP_FREE,
   SUBSCRIPTIONS_LIVE,
+  REFERRALS_LIVE,
+  LEADERBOARD_LIVE,
+  ADS_ENABLED,
+  SUBSCRIPTIONS_UI,
   VIP_STARS,
   MAX_STARS,
   VAULT_ARCHIVE_ENABLED,
@@ -91,7 +96,21 @@ test("DAILY_CAP_ON default is true, TEMP_FREE default true, WATERMARK false", ()
   assert.equal(DAILY_CAP_ON, true);
   assert.equal(TEMP_FREE, true);
   assert.equal(SUBSCRIPTIONS_LIVE, false);
+  assert.equal(REFERRALS_LIVE, false);
+  assert.equal(LEADERBOARD_LIVE, false);
   assert.equal(WATERMARK_ENABLED, false);
+});
+
+test("engagement live flags stay OFF until Squad C 48h window", () => {
+  assert.equal(REFERRALS_LIVE, false);
+  assert.equal(LEADERBOARD_LIVE, false);
+  assert.equal(SUBSCRIPTIONS_LIVE, false);
+});
+
+test("website product v2 flags: ads off, subscriptions UI on, live payments off", () => {
+  assert.equal(ADS_ENABLED, false);
+  assert.equal(SUBSCRIPTIONS_UI, true);
+  assert.equal(SUBSCRIPTIONS_LIVE, false);
 });
 
 test("feature flag defaults keep Arabic product identity on", () => {
@@ -99,7 +118,7 @@ test("feature flag defaults keep Arabic product identity on", () => {
   assert.equal(AI_ENABLED, true);
   assert.equal(COFFEE_ENABLED, true);
   assert.equal(LAUNCH_MODE, true);
-  assert.equal(DOWNLOAD_TIMEOUT_MS, 900000);
+  assert.equal(DOWNLOAD_TIMEOUT_MS, 280000);
   assert.equal(MAX_CONCURRENT_JOBS, 3);
   assert.equal(MAX_DOWNLOAD_SIZE_MB, 500);
   assert.equal(TELEGRAM_CLOUD_MAX_MB, 50);
@@ -113,7 +132,8 @@ test("feature flag defaults keep Arabic product identity on", () => {
   assert.equal(ADMIN_LOCK_MINUTES, 15);
   assert.equal(BARQ_TIMEZONE, "Asia/Riyadh");
   assert.equal(CLEANUP_ENABLED, true);
-  assert.equal(DAILY_CAP, 5);
+  assert.equal(DAILY_CAP, 10);
+  assert.equal(FREE_DOWNLOADS, 10);
   assert.equal(BARQ_AI_DAILY, 10);
   assert.equal(VIP_STARS, 200);
   assert.equal(MAX_STARS, 200);

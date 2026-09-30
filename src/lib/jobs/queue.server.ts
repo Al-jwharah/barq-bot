@@ -299,7 +299,16 @@ export async function expireCompletedJobs() {
   }
 }
 
-export async function reclaimStuckJobs() {
+/** Process-local cooldown so concurrent drain kicks do not all scan/kill stuck rows. */
+const RECLAIM_COOLDOWN_MS = 4_000;
+let lastReclaimAt = 0;
+
+export async function reclaimStuckJobs(opts?: { force?: boolean }) {
+  const now = Date.now();
+  if (!opts?.force && lastReclaimAt > 0 && now - lastReclaimAt < RECLAIM_COOLDOWN_MS) {
+    return;
+  }
+  lastReclaimAt = now;
   const sql = await sqlClient();
   const timeoutMs = jobTimeoutMs();
   const rows = await sql.query<{ id: string; attempts: number; max_attempts: number }>(
@@ -320,8 +329,8 @@ export async function reclaimStuckJobs() {
 
 export async function claimNextJob(id?: string): Promise<DownloadJob | null> {
   await ensure();
-  await reclaimStuckJobs().catch(() => undefined);
-  await expireCompletedJobs().catch(() => undefined);
+  // Reclaim/expire live on webhook root, /api/jobs depth 0, and /api/keep — not on every claim
+  // (keeps first-job latency snappy; cooldown reclaim must not gate every message).
   const { withTransaction } = await import("@/lib/db");
   return withTransaction(async (sql) => {
     const { dbSource } = await import("@/lib/db");
@@ -564,35 +573,56 @@ export async function jobStats(): Promise<JobCounts> {
 }
 
 export async function kickJobWorker(jobId?: string): Promise<boolean> {
+  // Architecture B: when BARQ_EXTERNAL_WORKER=on, Vercel only wakes the always-on
+  // worker (or no-ops if the worker polls). Heavy extract never runs here.
+  const { externalWorkerEnabled } = await import("../../worker/flags");
+  if (externalWorkerEnabled()) {
+    const { kickOrWakeExternal } = await import("../../worker/wake");
+    const mode = await kickOrWakeExternal(jobId);
+    return mode === "woke" || mode === "poll";
+  }
+
+  const { attachWaitUntil, drainJobs, processDownloadJob } = await import("./worker.server");
   const secret = jobSecret();
   const origin = internalOrigin();
-  if (!origin) return false;
-  const url = `${origin}/api/jobs`;
-  const run = fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-barq-job": secret },
-    body: JSON.stringify({ id: jobId, secret }),
-    signal: AbortSignal.timeout(25000),
-  }).then(async (res) => {
-    if (res.ok) return;
-    const { drainJobs, processDownloadJob } = await import("./worker.server");
-    if (jobId) await processDownloadJob(jobId);
-    else await drainJobs();
-  }).catch(async () => {
+  if (!origin) {
+    // Local / missing internal origin: drain in-process so enqueue never dead-ends.
     try {
-      const { drainJobs, processDownloadJob } = await import("./worker.server");
+      if (jobId) await processDownloadJob(jobId);
+      else await drainJobs();
+    } catch {
+      /* isolate */
+    }
+    return true;
+  }
+
+  const runLocal = async () => {
+    try {
       if (jobId) await processDownloadJob(jobId);
       else await drainJobs();
     } catch {
       /* isolate freeze */
     }
-  });
-  try {
-    const { waitUntil } = await import("@vercel/functions");
-    waitUntil(run);
-  } catch {
-    /* Nitro may lack @vercel/request-context */
+  };
+
+  const url = `${origin}/api/jobs`;
+  const remote = fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-barq-job": secret, "x-barq-kick-depth": "0" },
+    body: JSON.stringify({ id: jobId, secret }),
+  })
+    .then(() => undefined)
+    .catch(() => undefined);
+
+  // On Vercel: detach the kick so the webhook is not tied to the full download.
+  // Do not await and do not fall back to a local claim after scheduling the kick
+  // (a short AbortSignal previously made the caller think the kick failed while
+  // /api/jobs may still be running).
+  if (attachWaitUntil(remote)) {
+    return true;
   }
-  await run;
+
+  // No Vercel request context (local / Nitro): process in-process.
+  await runLocal();
   return true;
 }
