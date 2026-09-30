@@ -12,6 +12,7 @@ export function updateTypeOf(update: TgUpdate): string {
   if (update.pre_checkout_query) return "pre_checkout_query";
   if (update.my_chat_member) return "my_chat_member";
   if (update.channel_post) return "channel_post";
+  if (update.inline_query) return "inline_query";
   return "unknown";
 }
 

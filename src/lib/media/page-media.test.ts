@@ -50,3 +50,17 @@ test("page title prefers og:title", () => {
   assert.equal(pageTitle(`<title>T</title><meta property="og:title" content="OG &amp; co">`), "OG & co");
   assert.equal(pageTitle(`<title> Plain </title>`), "Plain");
 });
+
+test("vxreddit preview: v.redd.it id becomes HLS candidate ranked first", () => {
+  const html = `<meta property="twitter:player:stream" content="https://v.redd.it/zv89llsvexdz/DASH_720.mp4?source=fallback">
+  <meta property="og:video" content="https://vxreddit.com/player?url=https%3A%2F%2Fv.redd.it%2Fzv89llsvexdz%2FDASH_480.mp4">`;
+  const c = pageMediaCandidates(html, "https://www.reddit.com/r/x/comments/abc/t/");
+  assert.equal(c[0]?.url, "https://v.redd.it/zv89llsvexdz/HLSPlaylist.m3u8");
+  assert.ok(c.some((x) => x.url.startsWith("https://v.redd.it/zv89llsvexdz/DASH_720.mp4")));
+});
+
+test("encoded v.redd.it inside a mirror wrapper still yields HLS first", () => {
+  const html = `<meta property="og:video" content="https://vxreddit.com/redditvideo.mp4?video_url=https%3A%2F%2Fv.redd.it%2Fq20whktvzjkh1%2FCMAF_720.mp4">`;
+  const c = pageMediaCandidates(html, "https://www.reddit.com/r/x/comments/abc/t/");
+  assert.equal(c[0]?.url, "https://v.redd.it/q20whktvzjkh1/HLSPlaylist.m3u8");
+});

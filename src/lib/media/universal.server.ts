@@ -25,6 +25,7 @@ export function uploadCapBytes(): number {
 import { ensureFfmpeg } from "./convert.server";
 import { assertSafeOutboundUrl, SsrfError } from "./ssrf";
 import { fetchText } from "./http";
+import { pageSources, type PageSource } from "./page-sources.server";
 import { iframeFromOembed, oembedLinks, pageMediaCandidates, pageTitle, pageUrlPool, type MediaCandidate } from "./page-media";
 import { currentJobId, setJobChild } from "../jobs/proc-registry";
 import { MediaBlockedError } from "../bot/safety";
@@ -41,7 +42,7 @@ export type UniversalDownload = {
   thumbnail?: string;
   /** The URL that actually produced the file (page, embed, or manifest). */
   mediaUrl: string;
-  via: "ytdlp" | "page" | "ai";
+  via: "ytdlp" | "page" | "crawler" | "mirror" | "reader" | "ai";
   parts: UniversalPart[];
   cleanup: () => Promise<void>;
 };
@@ -52,6 +53,8 @@ export type UniversalOptions = {
   /** Content guard for every target URL (porn/music policy). Throw to block. */
   guard?: (target: string) => Promise<void>;
   signal?: AbortSignal;
+  /** Test seam: page readers. */
+  pages?: (url: string, deadline: number) => AsyncIterable<PageSource>;
   /** Test seam. */
   pickWithAi?: (pageUrl: string, title: string | undefined, pool: string[]) => Promise<string | null>;
 };
@@ -236,7 +239,12 @@ async function ytdlpFile(
   await assertSafeOutboundUrl(target);
   const bin = await ensureYtDlp();
   const args = buildFileArgs({ target, dir, ffmpeg, referer });
-  const run = await runBin(bin, args, dir, Math.min(remaining(deadline), 240_000), signal);
+  let run = await runBin(bin, args, dir, Math.min(remaining(deadline), 240_000), signal);
+  // Cloudflare JS challenge: yt-dlp can retry with browser TLS impersonation (bundled curl_cffi, free).
+  if (run.code !== 0 && /Cloudflare anti-bot/i.test(run.stderr) && remaining(deadline) > 20_000) {
+    const retry = await runBin(bin, ["--extractor-args", "generic:impersonate", ...args], dir, Math.min(remaining(deadline), 120_000), signal);
+    if (retry.code === 0 || !/Cloudflare anti-bot/i.test(retry.stderr)) run = retry;
+  }
   if (run.code !== 0) {
     const e = new Error(ytdlpReason(run.stderr)) as Error & { detail?: string };
     e.detail = (run.stderr.split("\n").reverse().find((l) => /ERROR:/.test(l)) ?? `exit ${run.code}`).slice(0, 200);
@@ -296,12 +304,6 @@ export async function splitForTelegram(
     ratio *= 0.7;
   }
   throw new Error("FILE_TOO_LARGE");
-}
-
-async function fetchPage(url: string): Promise<{ html: string; finalUrl: string }> {
-  const { text, finalUrl, status } = await fetchText(url, undefined, 12_000);
-  if (status >= 400) throw new Error(status === 404 || status === 410 ? "GONE" : "DOWNLOAD_FAILED");
-  return { html: text.slice(0, 3_000_000), finalUrl };
 }
 
 export async function universalDownload(url: string, opts: UniversalOptions = {}): Promise<UniversalDownload> {
@@ -365,14 +367,10 @@ export async function universalDownload(url: string, opts: UniversalOptions = {}
     got = await attempt(url);
 
     if (!got && remaining(deadline) > 15_000) {
-      let page: { html: string; finalUrl: string } | null = null;
-      try {
-        page = await fetchPage(url);
-      } catch (err) {
-        reasons.push(err instanceof Error ? err.message : "PAGE_FAILED");
-      }
-      if (page) {
-        pageTitleText = pageTitle(page.html);
+      const tried = new Set<string>([url]);
+      let firstPage: PageSource | null = null;
+      for await (const page of (opts.pages ?? pageSources)(url, deadline)) {
+        pageTitleText = pageTitleText ?? pageTitle(page.html);
         const candidates: MediaCandidate[] = pageMediaCandidates(page.html, page.finalUrl);
         for (const link of oembedLinks(page.html, page.finalUrl)) {
           try {
@@ -386,26 +384,32 @@ export async function universalDownload(url: string, opts: UniversalOptions = {}
             /* oEmbed is optional */
           }
         }
-        for (const c of candidates.slice(0, 5)) {
+        const fresh = candidates.filter((c) => !tried.has(c.url)).slice(0, 5);
+        for (const c of fresh) {
           if (remaining(deadline) < 15_000) break;
+          tried.add(c.url);
           got = await attempt(c.url, page.finalUrl);
           if (got) {
             mediaUrl = c.url;
-            via = "page";
+            via = page.via === "direct" ? "page" : page.via;
             break;
           }
         }
-        if (!got && remaining(deadline) > 20_000) {
-          const tried = new Set(candidates.slice(0, 5).map((c) => c.url));
-          const pool = pageUrlPool(page.html, page.finalUrl).filter((u) => !tried.has(u) && u !== url);
-          const pick = opts.pickWithAi ?? (await import("../bot/grok.server")).grokPickMediaUrl;
-          const chosen = await pick(page.finalUrl, pageTitleText, pool).catch(() => null);
-          if (chosen) {
-            got = await attempt(chosen, page.finalUrl);
-            if (got) {
-              mediaUrl = chosen;
-              via = "ai";
-            }
+        if (got) break;
+        firstPage = firstPage ?? page;
+        if (remaining(deadline) < 15_000) break;
+      }
+      // Last resort: Grok picks from real URLs on the first readable page.
+      if (!got && firstPage && remaining(deadline) > 20_000) {
+        const pool = pageUrlPool(firstPage.html, firstPage.finalUrl).filter((u) => !tried.has(u));
+        const pick = opts.pickWithAi ?? (await import("../bot/grok.server")).grokPickMediaUrl;
+        const chosen = await pick(firstPage.finalUrl, pageTitleText, pool).catch(() => null);
+        if (chosen) {
+          tried.add(chosen);
+          got = await attempt(chosen, firstPage.finalUrl);
+          if (got) {
+            mediaUrl = chosen;
+            via = "ai";
           }
         }
       }
@@ -435,7 +439,7 @@ export async function universalDownload(url: string, opts: UniversalOptions = {}
     }
     return {
       kind,
-      title: meta.title || pageTitleText,
+      title: (meta.title && !/^(HLSPlaylist|DASH_\w+|CMAF_\w+|master|index|playlist|videoplayback)$/i.test(meta.title) ? meta.title : undefined) || pageTitleText || meta.title,
       extractor: meta.extractor,
       duration: meta.duration,
       width: meta.width,

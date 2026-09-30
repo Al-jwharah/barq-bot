@@ -181,6 +181,17 @@ export async function blobToMp3(blob: Blob, timeoutMs = 45000): Promise<Blob> {
   });
 }
 
+/** Telegram voice note: OGG/Opus mono, capped at 20 minutes. */
+export async function blobToVoice(blob: Blob, timeoutMs = 60000): Promise<Blob> {
+  return withTemp(async (dir) => {
+    const input = join(dir, "in.bin");
+    const out = join(dir, "out.ogg");
+    await writeFile(input, Buffer.from(await blob.arrayBuffer()));
+    await run(["-y", "-i", input, "-vn", "-t", "1200", "-ac", "1", "-c:a", "libopus", "-b:a", "48k", out], timeoutMs);
+    return new Blob([await readFile(out)], { type: "audio/ogg" });
+  });
+}
+
 export async function blobToMp4(blob: Blob, timeoutMs = 50000): Promise<Blob> {
   return withTemp(async (dir) => {
     const input = join(dir, "in.bin");

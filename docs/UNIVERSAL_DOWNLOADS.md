@@ -20,3 +20,38 @@ news sites return a Cloudflare challenge. Optional owner settings (never logged)
 - `YTDLP_COOKIES_B64` — base64 of a Netscape `cookies.txt` exported from a throwaway logged-in account.
 
 Set in Vercel (Production + Preview) and redeploy.
+
+## Free fallbacks for bot-walled pages (no signup, no keys)
+
+`src/lib/media/page-sources.server.ts` reads a page in this order, stopping as soon as media is found:
+
+1. Direct fetch (browser UA).
+2. Direct fetch as a chat-preview crawler (`TelegramBot (like TwitterBot)`).
+3. Public chat-preview mirrors (Reddit → `vxreddit.com`, `rxddit.com`, same path). The
+   `v.redd.it/<id>/HLSPlaylist.m3u8` master (audio + video) is ranked first.
+4. Jina Reader (`r.jina.ai`, free anonymous tier, rate limited).
+
+Mirrors and the reader carry in-memory health: 3 failures → 10-minute cooldown, then retried.
+Every media target still passes the SSRF guard and the porn/music policy (`guard`).
+The Grok pick runs once, after all sources, on the first readable page.
+yt-dlp retries once with `generic:impersonate` on a Cloudflare JS challenge.
+
+Evaluated and rejected (2026-09-30, from Vercel fra1): public Cobalt instances (need Turnstile JWT /
+API keys or Cloudflare-blocked), Invidious/Piped (API off, down, or bot-checked), all yt-dlp YouTube
+player clients (IP-level "confirm you're not a bot"), loader.to-style APIs (ToS requires paid API).
+YouTube from Vercel needs a residential IP (run `src/worker` on a home machine) or `YTDLP_PROXY` /
+`YTDLP_COOKIES_B64`.
+
+## Owner feature flags (owner panel → «الميزات»)
+
+Stored in `bot_settings` as `ff_<name>` (`on`/`off`); unset = default below.
+
+| Flag | Default | What it does |
+|---|---|---|
+| `ff_quality` | env `BARQ_QUALITY_PICKER` (off) | Quality picker before delivery (360–1080 / audio). |
+| `ff_audio` | off | After a video: «صوت فقط 🎵» (MP3) and «رسالة صوتية 🎙» (OGG/Opus voice note). Only offered for media that already passed the music/porn filter. |
+| `ff_trim` | off | Trim the last video from chat: `من 1:20 إلى 2:05` (Arabic digits ok, ≤ 3 min). |
+| `ff_post_ai` | env `BARQ_POST_DELIVERY_AI` (off) | Grok row after each file: summary · caption · translate. |
+| `ff_batch` | on | Several links in one message (3 free / 5 premium). Off = first link only. |
+| `ff_inline` | off | `@bot <link>` in any chat: re-sends an already-delivered (cached) video, or an "open Barq" card. Also needs BotFather → /setinline. |
+| `ff_owner_report` | on | Daily numbers to the owner only (`BARQ_OWNER_TG_ID`), from the daily `/api/keep` cron, at most once per 20h. «معاينة التقرير» in the panel shows it without sending. |

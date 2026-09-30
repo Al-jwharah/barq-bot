@@ -94,7 +94,10 @@ async function homeButtons(s: BotSettings, role: Role = "owner"): Promise<TgBtn[
       { text: "المهام", callback_data: "adm:jobs" },
       { text: "البلاغات", callback_data: "adm:reports" },
     ],
-    [{ text: "تذاكر الدعم", callback_data: "adm:tickets" }],
+    [
+      { text: "تذاكر الدعم", callback_data: "adm:tickets" },
+      { text: "الميزات", callback_data: "adm:ff" },
+    ],
   ];
   return rows
     .map((row) =>
@@ -253,6 +256,19 @@ async function show(
     }
   }
   await telegram.sendMessage(chatId, text, extra);
+}
+
+async function featuresView(): Promise<{ text: string; buttons: TgBtn[][] }> {
+  const { FEATURES, FEATURE_ORDER } = await import("./features");
+  const { allFeatures } = await import("./features.server");
+  const state = await allFeatures();
+  const lines = FEATURE_ORDER.map((n) => `${state[n] ? "🟢" : "⚪"} ${FEATURES[n].label}\n   ${FEATURES[n].hint}`);
+  const buttons: TgBtn[][] = FEATURE_ORDER.map((n) => [
+    { text: `${state[n] ? "🟢" : "⚪"} ${FEATURES[n].label}`, callback_data: `adm:ff:${n}` },
+  ]);
+  buttons.push([{ text: "معاينة التقرير", callback_data: "adm:ffrep" }]);
+  buttons.push([{ text: "رجوع", callback_data: "adm:home" }]);
+  return { text: `الميزات ⚙️ (اضغط للتشغيل/الإيقاف)\n\n${lines.join("\n")}`, buttons };
 }
 
 export async function sendOwnerPanel(chatId: number, messageId?: number) {
@@ -802,6 +818,28 @@ export async function handleOwnerPanelCallback(cb: TgCallbackQuery): Promise<voi
     const rows = await store.listFilterEvents(10);
     const body = rows.map((r) => `${r.tg_id ?? ""} · ${r.reason ?? r.kind}`).join("\n");
     await telegram.sendMessage(chatId, `البلاغات\n${body || "لا بلاغات"}`);
+    return;
+  }
+  if (data === "adm:ff" || data.startsWith("adm:ff:")) {
+    const { FEATURES, isFeatureName } = await import("./features");
+    const { toggleFeature } = await import("./features.server");
+    const name = data.slice("adm:ff:".length);
+    if (data.startsWith("adm:ff:") && isFeatureName(name)) {
+      const next = await toggleFeature(name);
+      await telegram.answerCallback(cb.id, `${FEATURES[name].label}: ${flag(next)}`);
+    } else {
+      await telegram.answerCallback(cb.id);
+    }
+    const view = await featuresView();
+    await show(chatId, messageId, view.text, view.buttons);
+    return;
+  }
+  if (data === "adm:ffrep") {
+    await telegram.answerCallback(cb.id);
+    const { dailyNumbers, reportText } = await import("./owner-report.server");
+    const { riyadhDay } = await import("./clock");
+    const text = reportText(await dailyNumbers(), riyadhDay());
+    await show(chatId, messageId, `معاينة (لم يُرسل لأحد)\n\n${text}`, [[{ text: "رجوع للميزات", callback_data: "adm:ff" }]]);
     return;
   }
   if (data === "adm:tickets") {

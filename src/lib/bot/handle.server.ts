@@ -9,7 +9,6 @@ import {
   BOT_DISPLAY_NAME,
   BOT_USERNAME,
   AI_ENABLED,
-  POST_DELIVERY_AI,
   TEMP_FREE,
   MAINTENANCE,
   MAINTENANCE_TEXT,
@@ -84,11 +83,14 @@ import {
   type Member,
 } from "./store.server";
 import { ERROR_MESSAGES } from "./errors";
+import { normalizeTrimText } from "./features";
+import { featureOn } from "./features.server";
 import {
   inlineKeyboard,
   replyKeyboard,
   sendAnimationFile,
   sendAudioFile,
+  sendVoiceFile,
   sendDocumentFile,
   sendPhotoFile,
   sendVideoFile,
@@ -688,6 +690,7 @@ export async function offerAudioOnly(
   fromId: number,
   result: ExtractResult,
   stamp: boolean,
+  voice = false,
 ): Promise<void> {
   const item =
     result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") ??
@@ -696,9 +699,11 @@ export async function offerAudioOnly(
   const { saveMediaPick, toPickPayload } = await import("./library.server");
   const pickId = await saveMediaPick(fromId, chatId, toPickPayload(result, stamp));
   const q = chosenQualityLabel(item);
+  const row: TgBtn[] = [{ text: "صوت فقط 🎵", callback_data: `q:${pickId}:mp3` }];
+  if (voice) row.push({ text: "رسالة صوتية 🎙", callback_data: `q:${pickId}:voice` });
   await telegram
     .sendMessage(chatId, `الجودة المُرسلة: ${q}\nيمكنك أيضًا استخراج الصوت:`, {
-      reply_markup: inlineKeyboard([[{ text: "صوت فقط 🎵", callback_data: `q:${pickId}:mp3` }]]),
+      reply_markup: inlineKeyboard([row]),
     })
     .catch(() => undefined);
 }
@@ -708,6 +713,7 @@ export async function sendQualityPicker(
   fromId: number,
   result: ExtractResult,
   stamp: boolean,
+  voice = false,
 ): Promise<boolean> {
   const item =
     result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") ??
@@ -732,6 +738,7 @@ export async function sendQualityPicker(
     { text: "أفضل متاح ⚡️", callback_data: `q:${pickId}:best` },
     { text: "صوت فقط 🎵", callback_data: `q:${pickId}:mp3` },
   ]);
+  if (voice) rows.push([{ text: "رسالة صوتية 🎙", callback_data: `q:${pickId}:voice` }]);
 
   const title = (result.title || result.text || "").trim().slice(0, 80);
   const head = title ? `اختر الجودة\n${title}` : "اختر الجودة أو صوت فقط";
@@ -754,9 +761,18 @@ export async function fulfillQualityPick(chatId: number, fromId: number, pickId:
     return;
   }
   const variant = variantForChoice(item, choice);
-  await telegram.sendChatAction(chatId, choice === "mp3" ? "upload_voice" : "upload_video");
-  const { blobToMp3, blobToMp4, needsMp4Remux } = await import("../media/convert.server");
-  if (choice === "mp3") {
+  await telegram.sendChatAction(chatId, choice === "mp3" || choice === "voice" ? "upload_voice" : "upload_video");
+  const { blobToMp3, blobToMp4, blobToVoice, needsMp4Remux } = await import("../media/convert.server");
+  if (choice === "voice") {
+    try {
+      const audio = result.items.find((i) => i.kind === "audio");
+      const blob = await blobToVoice(await downloadBlob(audio?.url || variant.url));
+      await sendVoiceFile(chatId, blob, `barq-${result.id ?? "v"}.ogg`);
+    } catch {
+      await telegram.sendMessage(chatId, "تعذر تحويل المقطع لرسالة صوتية. أعد إرسال الرابط واختر «صوت فقط».");
+      return;
+    }
+  } else if (choice === "mp3") {
     try {
       const audio = result.items.find((i) => i.kind === "audio");
       if (audio?.url) {
@@ -809,7 +825,7 @@ export async function fulfillQualityPick(chatId: number, fromId: number, pickId:
     messageIds: [],
     sourceUrl: result.sourceUrl,
     mediaUrl: variant.url,
-    kind: choice === "mp3" ? "audio" : item.kind,
+    kind: choice === "mp3" || choice === "voice" ? "audio" : item.kind,
     who: { id: fromId },
   }).catch(() => undefined);
   await sendPlayCard(chatId, fromId, result).catch(() => undefined);
@@ -1723,10 +1739,10 @@ function pickPlayUrl(result: ExtractResult): string | undefined {
 
 /**
  * Post-download extra message. Off by default (the file itself carries clip/publish/save/share).
- * BARQ_POST_DELIVERY_AI=on restores the v2 «برق AI» row (لخّصه · كابشن · ترجمة) after each file.
+ * Owner panel «الميزات» → ملخص/كابشن Grok (env BARQ_POST_DELIVERY_AI seeds the default) restores the v2 «برق AI» row (لخّصه · كابشن · ترجمة) after each file.
  */
 export async function sendAfterDownload(chatId: number, fromId?: number) {
-  if (!POST_DELIVERY_AI) return;
+  if (!(await featureOn("post_ai"))) return;
   const uid = fromId ?? chatId;
   const clip = lastClip(uid) ?? lastClip(chatId);
   const { shareTargets } = await import("./product.server");
@@ -1901,7 +1917,8 @@ async function enqueueMessageUrls(
   updateId?: number,
 ) {
   const { hasPremium } = await import("./plans.server");
-  const cap = hasPremium(member, fromId) ? 5 : MULTI_LINK_CAP;
+  const batchOn = await featureOn("batch").catch(() => true);
+  const cap = !batchOn ? 1 : hasPremium(member, fromId) ? 5 : MULTI_LINK_CAP;
   const { batch, total } = selectDownloadUrls(urls, cap);
   if (!batch.length) return;
   const { multiLinkProgressText } = await import("./engagement");
@@ -2853,12 +2870,19 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     });
     return;
   }
-  if (peekAwait(fromId) === "clip_range" && !/https?:\/\//i.test(text)) {
+  const trimText = !/https?:\/\//i.test(text) ? normalizeTrimText(text) : null;
+  const chatTrim =
+    Boolean(trimText) && peekAwait(fromId) !== "clip_range" && (await featureOn("trim").catch(() => false));
+  if ((peekAwait(fromId) === "clip_range" && !/https?:\/\//i.test(text)) || chatTrim) {
     clearAwait(fromId);
     await telegram.sendChatAction(chatId, "upload_video");
     try {
       const { clipLastVideo } = await import("./file-actions.server");
-      const blob = await clipLastVideo(fromId, text);
+      if (chatTrim) {
+        const { recallClip } = await import("./library.server");
+        await recallClip(fromId).catch(() => undefined);
+      }
+      const blob = await clipLastVideo(fromId, trimText ?? text);
       await sendVideoFile(chatId, blob, "clip.mp4", {});
       await telegram.sendMessage(chatId, "✂️ تم القص.");
     } catch (err) {
@@ -2993,6 +3017,12 @@ export async function handleUpdate(update: TgUpdate) {
     if (update.my_chat_member) {
       const { handleBotMembership } = await import("./vault.server");
       await handleBotMembership(update.my_chat_member);
+      await markTelegramUpdateProcessed(update.update_id);
+      return;
+    }
+    if (update.inline_query) {
+      const { handleInlineQuery } = await import("./inline.server");
+      await handleInlineQuery(update.inline_query);
       await markTelegramUpdateProcessed(update.update_id);
       return;
     }

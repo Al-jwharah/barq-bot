@@ -3,7 +3,7 @@ import { getSql } from "@/lib/db";
 import type { ExtractResult, MediaItem, MediaVariant } from "../media/types";
 import { MONTHLY_CAP } from "./config.server";
 
-export type QualityChoice = "360" | "480" | "720" | "1080" | "best" | "mp3" | "file" | "snap";
+export type QualityChoice = "360" | "480" | "720" | "1080" | "best" | "mp3" | "voice" | "file" | "snap";
 
 export type PickPayload = {
   sourceUrl: string;
@@ -31,7 +31,7 @@ export function monthlyLine(used: number, cap: number, unlimited: boolean): stri
 }
 
 export function parseQualityCallback(data: string): { id: string; choice: QualityChoice } | null {
-  const m = data.match(/^q:([a-f0-9]{8,16}):(360|480|720|1080|best|mp3|file|snap)$/);
+  const m = data.match(/^q:([a-f0-9]{8,16}):(360|480|720|1080|best|mp3|voice|file|snap)$/);
   if (!m) return null;
   return { id: m[1]!, choice: m[2] as QualityChoice };
 }
@@ -54,6 +54,7 @@ export function variantForChoice(item: MediaItem, choice: QualityChoice): MediaV
 
 export function choiceLabel(choice: QualityChoice, variant?: MediaVariant): string {
   if (choice === "mp3") return "MP3";
+  if (choice === "voice") return "رسالة صوتية";
   if (choice === "file") return "ملف";
   if (choice === "snap") return "سناب";
   if (choice === "best") return variant?.quality || "أصل";
