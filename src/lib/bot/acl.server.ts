@@ -47,6 +47,8 @@ const CALLBACK_PERM: Record<string, Permission> = {
   "adm:retry": "jobs.retry",
   "adm:reports": "reports.review",
   "adm:tickets": "tickets.read",
+  "adm:ff": "settings.write",
+  "adm:ffrep": "settings.write",
 };
 
 const GROK_TOOL_PERM: Record<string, Permission> = {

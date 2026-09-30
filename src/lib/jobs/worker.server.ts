@@ -185,8 +185,9 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   result = forceTikTokFile(result);
   await saveExtractCache(job.url, result).catch(() => undefined);
   await assertSafeMedia(job.url, result);
-  const { QUALITY_PICKER } = await import("../bot/config.server");
-  // Quality picker / audio-only offer are opt-in (BARQ_QUALITY_PICKER=on): default is the fast direct file.
+  const { featureOn } = await import("../bot/features.server");
+  // Quality picker / audio-only offer are opt-in (owner panel «الميزات»; env BARQ_QUALITY_PICKER seeds the default).
+  const [QUALITY_PICKER, AUDIO_OFFER] = await Promise.all([featureOn("quality"), featureOn("audio")]);
   const stampTask = (async () => {
     if (!QUALITY_PICKER) return false;
     const { isOwnerId } = await import("../bot/config.server");
@@ -250,7 +251,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     },
   }).catch(() => undefined);
   await sendPlayCard(chatId, fromId, result).catch(() => undefined);
-  if (QUALITY_PICKER) await offerAudioOnly(chatId, fromId, result, stamp).catch(() => undefined);
+  if (QUALITY_PICKER || AUDIO_OFFER) await offerAudioOnly(chatId, fromId, result, stamp, AUDIO_OFFER).catch(() => undefined);
   if (await applyJobQuota(job.id)) {
     await bumpDownload(fromId);
     const { bumpDownloadOk } = await import("../bot/growth.server");

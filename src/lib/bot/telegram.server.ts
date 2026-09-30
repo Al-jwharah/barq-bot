@@ -63,6 +63,7 @@ export type TgUpdate = {
     new_chat_member?: { status?: string };
   };
   channel_post?: TgMessage;
+  inline_query?: { id: string; from: TgUser; query: string };
 };
 
 export type TgBtn = { text: string; url?: string; callback_data?: string };
@@ -123,6 +124,7 @@ export const telegram = {
           "pre_checkout_query",
           "my_chat_member",
           "channel_post",
+          "inline_query",
         ],
       },
       10000,
@@ -176,6 +178,8 @@ export const telegram = {
     call<TgMessage>("sendAudio", { chat_id: chatId, audio, ...extra }, 120000),
   sendMediaGroup: (chatId: number, media: unknown[]) =>
     call("sendMediaGroup", { chat_id: chatId, media }, 120000),
+  answerInlineQuery: (id: string, results: Record<string, unknown>[], extra: Record<string, unknown> = {}) =>
+    call("answerInlineQuery", { inline_query_id: id, results, ...extra }, 8000),
   answerCallback: (id: string, text?: string, alert = false) =>
     call(
       "answerCallbackQuery",
@@ -348,6 +352,22 @@ export async function sendAudioFile(
   };
   if (!json.ok) throw new Error(json.description || "sendAudio failed");
   return { file_id: json.result?.audio?.file_id, message_id: json.result?.message_id };
+}
+
+export async function sendVoiceFile(
+  chatId: number,
+  blob: Blob,
+  filename: string,
+  extra: Record<string, string> = {},
+) {
+  const form = new FormData();
+  form.set("chat_id", String(chatId));
+  form.set("voice", blob, filename);
+  for (const [k, v] of Object.entries(extra)) form.set(k, v);
+  const res = await fetch(`${TELEGRAM_API}/sendVoice`, { method: "POST", body: form });
+  const json = (await res.json()) as { ok: boolean; result?: { message_id?: number }; description?: string };
+  if (!json.ok) throw new Error(json.description || "sendVoice failed");
+  return { message_id: json.result?.message_id };
 }
 
 export async function sendPhotoFile(

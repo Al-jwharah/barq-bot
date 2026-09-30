@@ -127,7 +127,26 @@ export function pageMediaCandidates(html: string, baseUrl: string, limit = 12): 
     push(m[0], "direct", "script");
   }
 
-  const rank = (c: MediaCandidate) => (c.type === "direct" ? 0 : c.type === "manifest" ? 1 : 2);
+  // Media URLs nested in query strings (player/mirror wrappers: ?video_url=…m3u8).
+  for (const c of [...found]) {
+    try {
+      for (const v of new URL(c.url).searchParams.values()) {
+        if (/^https?:\/\//i.test(v) && (DIRECT_RE.test(v) || MANIFEST_RE.test(v))) push(v, "direct", `${c.source}:nested`);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  // Reddit-hosted video: the HLS master carries both audio and video.
+  const reddIds = new Set<string>();
+  for (const m of [text, ...found.map((c) => c.url)].join("\n").matchAll(/https?:\/\/v\.redd\.it\/([A-Za-z0-9]{6,20})/g)) {
+    if (m[1]) reddIds.add(m[1]);
+  }
+  for (const id of reddIds) {
+    found.unshift({ url: `https://v.redd.it/${id}/HLSPlaylist.m3u8`, type: "manifest", source: "v.redd.it" });
+  }
+
+  const rank = (c: MediaCandidate) => (c.source === "v.redd.it" ? -1 : c.type === "direct" ? 0 : c.type === "manifest" ? 1 : 2);
   const seen = new Set<string>();
   const unique: MediaCandidate[] = [];
   for (const c of found.sort((a, b) => rank(a) - rank(b))) {

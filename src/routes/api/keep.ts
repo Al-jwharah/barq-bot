@@ -100,6 +100,8 @@ async function tick() {
       const { cleanupFileCache } = await import("@/lib/bot/file-cache.server");
       await pollLiveFollows().catch(() => undefined);
       await runDailyBackup().catch(() => undefined);
+      const { maybeSendOwnerReport } = await import("@/lib/bot/owner-report.server");
+      await maybeSendOwnerReport().catch(() => undefined);
       await cleanupFileCache().catch(() => undefined);
       const { maybeHourlyReminder } = await import("@/lib/bot/remind.server");
       await maybeHourlyReminder().catch(() => undefined);
