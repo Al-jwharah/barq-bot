@@ -14,6 +14,7 @@ import { detectPlatform, firstUrl, isDirectMediaUrl, supportedDownloadPlatform, 
 import { fetchText } from "./http";
 import { extractPlaylistLead, extractWithYtdlp, fitTelegramCloud, fileTooLargeError } from "./ytdlp";
 import { assertPublicHttpUrl, assertSafeOutboundUrl, safeFetch, SsrfError } from "./ssrf";
+import { assertPreExtractBlocklist } from "../bot/safety";
 
 function isShortener(url: string): boolean {
   try {
@@ -128,8 +129,11 @@ async function extractForPlatform(url: string, platform: string): Promise<Extrac
 
 export async function extractMedia(input: string): Promise<ExtractResult> {
   const raw = firstUrl(input) ?? input.trim();
+  // Content policy BEFORE any network unwrap / platform extract / yt-dlp.
+  assertPreExtractBlocklist(raw);
   await assertSafeOutboundUrl(raw);
   let url = await unwrap(raw);
+  assertPreExtractBlocklist(url);
   await assertSafeOutboundUrl(url);
   if (isShortener(url)) {
     throw new Error(SHORT_HINT);

@@ -21,28 +21,28 @@ export const ACHIEVEMENTS: Record<string, { title: string; hint: string }> = {
   dl_25: { title: "رعد", hint: "٢٥ تحميلًا" },
   streak_3: { title: "ثلاثة أيام", hint: "سلسلة ٣ أيام" },
   streak_7: { title: "أسبوع نور", hint: "سلسلة ٧ أيام" },
-  first_ai: { title: "سأل Barq", hint: "أول رسالة لـ Barq AI" },
+  first_ai: { title: "سأل Barq", hint: "أول رسالة لـ برق AI" },
   supporter: { title: "كوب قهوة", hint: "دعمت المطور" },
   journey_start: { title: "متعلّم", hint: "أنهى رحلة البداية" },
   journey_safe: { title: "أمين", hint: "أنهى رحلة الأمان" },
-  journey_ai: { title: "رفيق الذكاء", hint: "أنهى رحلة Barq AI" },
+  journey_ai: { title: "رفيق الذكاء", hint: "أنهى رحلة برق AI" },
 };
 
 export const ONBOARDING = [
   {
     title: "أهلًا في برق ⚡️",
-    body: "الصق رابط المقطع ويصلك الملف بأعلى جودة.",
+    body: "الصق الرابط ← يصلك الفيديو. بعد الرابط: جودة أو صوت فقط عند التوفر.",
   },
   {
     title: "كيف تحمّل",
-    body: "١) انسخ رابط المقطع من أي منصة.\n٢) الصقه هنا.\n٣) يصلك الملف بأعلى جودة.",
+    body: "١) انسخ الرابط من يوتيوب / تيك توك / إنستغرام / إكس / فيسبوك.\n٢) الصقه هنا.\n٣) اختر الجودة أو «صوت فقط» إن ظهرت.",
   },
   {
-    title: "تنبيه",
-    body: "المحتوى الإباحي و+18 قد يودي للحظر.\nنحن براء أمام الله من هذا المحتوى.\nإن الله يراك. فاتقوا الله فيما تشاهدون.",
+    title: "جودة وصوت",
+    body: "بعد الرابط قد تظهر أزرار 720 / 1080 / أفضل متاح أو «صوت فقط».\nالصق الرابط ويصلك الملف.",
   },
   {
-    title: "Barq AI معك",
+    title: "برق AI معك",
     body: "اكتب بالعربية: «لخّص الفيديو» أو «اشرح الفكرة».\n١٠ رسائل يوميًا للجميع. بعدها التحميل يبقى متاحًا.",
   },
   {
@@ -69,7 +69,7 @@ export const JOURNEYS: Record<
       },
       {
         title: "يصلك الملف",
-        body: "بعد الرابط يرسل برق أعلى جودة مع الصوت مباشرة.",
+        body: "بعد الرابط قد تظهر أزرار الجودة أو «صوت فقط»، أو يصلك أفضل متاح.",
       },
     ],
   },
@@ -78,21 +78,21 @@ export const JOURNEYS: Record<
     achievement: "journey_safe",
     steps: [
       {
-        title: "تنبيه الإباحي",
-        body: "المحتوى الإباحي و+18 قد يودي للحظر. نحن براء أمام الله من هذا المحتوى.",
+        title: "الرابط العام",
+        body: "الصق روابط عامة يحق لك تنزيلها. احترم حقوق النشر وقوانين بلدك.",
       },
       {
-        title: "ماذا ترسل",
-        body: "الصق رابط المقطع ويصلك الملف. إن شككت أنه إباحي لا ترسله.",
+        title: "حماية القُصّر",
+        body: "مواد استغلال القُصّر محظورة تمامًا ويُوقف الحساب عندها.",
       },
       {
-        title: "تذكير",
-        body: "إن الله يراك. فاتقوا الله فيما تشاهدون. الدعم @i_2169",
+        title: "الدعم",
+        body: "للإبلاغ عن إساءة راسل @i_2169",
       },
     ],
   },
   ai: {
-    title: "رحلة Barq AI",
+    title: "رحلة برق AI",
     achievement: "journey_ai",
     steps: [
       {
@@ -339,6 +339,22 @@ export async function bumpDownloadOk(tgId: number | string, chatId?: number) {
   await track(tgId, "download_ok");
   const stats = await getGrowth(tgId);
   await unlockDue(stats, tgId, chatId);
+  if (chatId) {
+    await warnDailyLimitIfNeeded(chatId, tgId).catch(() => undefined);
+  }
+}
+
+/** B5: proactive warning at daily download #4 of 5. */
+export async function warnDailyLimitIfNeeded(chatId: number, tgId: number | string) {
+  const { DAILY_CAP, DAILY_CAP_ON } = await import("./config.server");
+  if (!DAILY_CAP_ON) return false;
+  const { todayDownloads } = await import("./store.server");
+  const { shouldWarnDailyLimit, dailyLimitWarningText } = await import("./engagement");
+  const used = await todayDownloads(tgId);
+  if (!shouldWarnDailyLimit(used, DAILY_CAP)) return false;
+  await telegram.sendMessage(chatId, dailyLimitWarningText(used, DAILY_CAP)).catch(() => undefined);
+  await track(tgId, "daily_limit_warn", String(used));
+  return true;
 }
 
 export async function bumpAi(tgId: number | string, chatId: number) {
@@ -401,7 +417,7 @@ export async function finishOnboarding(chatId: number, tgId: number | string) {
   await unlockDue({ ...stats, onboarding_step: -1 }, tgId, chatId);
   await telegram.sendMessage(
     chatId,
-    `صرت جاهزًا ⚡️\nالصق رابطًا أو اكتب لـ Barq AI.\nالدعم @${SUPPORT_USERNAME}`,
+    `صرت جاهزًا ⚡️\nالصق رابطًا أو اكتب لـ برق AI.\nالدعم @${SUPPORT_USERNAME}`,
   );
 }
 
@@ -415,16 +431,23 @@ function journeyMarkup(id: string, step: number, last: number) {
 
 export async function sendJourneyList(chatId: number, tgId: number | string) {
   const done = new Set(await completedJourneys(tgId).catch(() => [] as string[]));
+  const stats = await getGrowth(tgId).catch(() => null);
+  const { journeyStreakLine } = await import("./engagement");
+  const streakLine = journeyStreakLine(stats?.streak ?? 0, stats?.best_streak ?? 0);
   const lines = Object.entries(JOURNEYS)
     .map(([id, j]) => `${done.has(id) ? "✅" : "▫️"} ${j.title}`)
     .join("\n");
-  await telegram.sendMessage(chatId, `رحلات برق التعليمية\n\n${lines}\n\nاختر رحلة قصيرة (٣ دروس).`, {
-    reply_markup: inlineKeyboard([
-      [{ text: "رحلة البداية", callback_data: "gx:j:start:0" }],
-      [{ text: "رحلة الأمان", callback_data: "gx:j:safe:0" }],
-      [{ text: "رحلة Barq AI", callback_data: "gx:j:ai:0" }],
-    ]),
-  });
+  await telegram.sendMessage(
+    chatId,
+    `رحلتك ⚡️\n${streakLine}\n\nرحلات برق التعليمية\n\n${lines}\n\nاختر رحلة قصيرة (٣ دروس).`,
+    {
+      reply_markup: inlineKeyboard([
+        [{ text: "رحلة البداية", callback_data: "gx:j:start:0" }],
+        [{ text: "رحلة الأمان", callback_data: "gx:j:safe:0" }],
+        [{ text: "رحلة برق AI", callback_data: "gx:j:ai:0" }],
+      ]),
+    },
+  );
 }
 
 export async function sendJourneyStep(chatId: number, tgId: number | string, id: string, step: number) {

@@ -74,7 +74,7 @@ export async function botSettings(): Promise<BotSettings> {
     restrictionsOn: raw.restrictions_on === "on",
     dailyCapOn: DAILY_CAP_ON || raw.daily_cap_on === "on",
     publicOrigin: getPublicOrigin() || normalizeOrigin(raw.public_origin),
-    pornFilter: true,
+    pornFilter: false,
     ownerExemptCustom: on(raw.owner_exempt_custom),
   };
 }

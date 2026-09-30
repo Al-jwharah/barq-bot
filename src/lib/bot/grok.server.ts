@@ -9,6 +9,13 @@ import {
 } from "./config.server";
 import { parseGrokVerdict, type PornVerdict } from "./safety";
 import type { GrokModel, GrokSpeed } from "./config.server";
+import {
+  AI_DISABLED_AR,
+  AI_GENERIC_ERROR_AR,
+  AI_MISSING_KEY_AR,
+  BARQ_AI_BRAND,
+  isLoudAiFailure,
+} from "./ai/copy";
 
 const API = "https://api.x.ai/v1/chat/completions";
 
@@ -16,7 +23,7 @@ export function grokReady(): boolean {
   return Boolean(grokApiKey());
 }
 
-export const AI_USER_ERROR = "برق AI مشغول لحظة. الصق الرابط، أو أعد المحاولة بعد قليل.";
+export const AI_USER_ERROR = AI_GENERIC_ERROR_AR;
 export const AI_DAILY_LIMIT = BARQ_AI_DAILY;
 export const AI_INPUT_MAX = AI_MAX_MESSAGE_LENGTH;
 export const AI_TOKEN_MAX = AI_MAX_OUTPUT_TOKENS;
@@ -42,7 +49,7 @@ export function wantsWebSearch(text: string): boolean {
 }
 
 export function isAiFailureReply(text: string): boolean {
-  return text === AI_USER_ERROR || text.includes("متوقف مؤقت") || text.includes("يتهيأ");
+  return isLoudAiFailure(text) || text === AI_USER_ERROR || text.includes("متوقف مؤقت");
 }
 
 async function loadLastDownload(userId: number): Promise<{ url: string; title?: string; platform?: string } | undefined> {
@@ -205,12 +212,12 @@ async function chat(opts: {
   throw lastErr ?? new Error(AI_USER_ERROR);
 }
 
-const CLASSIFY_SYSTEM = `You classify media for برق, a Telegram downloader.
-ALLOW only: Islamic/religious clips, Quran, lectures, nasheed without pop music, beneficial stories, and clean comedy WITHOUT songs/music soundtrack.
-BLOCK: songs, music videos, pop/rap/oud tarab, instrumental entertainment music, women-focused entertainment (dancing, mixing, beauty, fashion modeling, "harim"), pornography, NSFW, 18+, age-restricted adult.
-If unsure between comedy-with-music vs clean comedy, block.
+const CLASSIFY_SYSTEM = `You classify media for برق, a general Telegram video downloader.
+ALLOW: ordinary adult content, music, entertainment, comedy, news, mainstream clips.
+BLOCK only: CSAM / child sexual abuse / sexual content involving minors (under 18).
+Do NOT block ordinary NSFW, pornography between adults, music, or "women/harem" entertainment.
 Reply JSON only:
-{"block":boolean,"kind":"porn_film"|"nsfw"|"music"|"women"|"comedy"|"other","confidence":0-1,"evidence_ar":"جملة دليل قصيرة بالعربية بدون وصف جنسي تفصيلي"}`;
+{"block":boolean,"kind":"csam"|"other","confidence":0-1,"evidence_ar":"جملة دليل قصيرة بالعربية بدون وصف جنسي تفصيلي"}`;
 
 export async function classifyPornWithGrok(input: {
   url: string;
@@ -248,7 +255,7 @@ Given a webpage URL and optional HTML snippet, return JSON only:
 {"media_url":"https://...","kind":"video"|"photo"|"gif"|"audio"}
 Rules:
 - media_url must be a direct https file (mp4/webm/jpg/png/gif/m4a) or a public CDN progressive URL, not an HTML watch page.
-- Never return porn-tube hosts, localhost, or private IPs.
+- Never return localhost or private IPs.
 - If you cannot find a real file URL, return {"media_url":"","kind":"video"}.`;
 
 export function parseGrokMediaHint(raw: string): { url: string; kind: "video" | "photo" | "gif" | "audio" } | null {
@@ -295,8 +302,8 @@ export async function grokFindDirectMedia(url: string): Promise<ExtractResult | 
     if (!hint) return null;
     const { assertSafeOutboundUrl } = await import("../media/ssrf");
     await assertSafeOutboundUrl(hint.url);
-    const { matchPornDomain } = await import("./safety");
-    if (matchPornDomain(hint.url)) return null;
+    const { matchCsamKeywords } = await import("./safety");
+    if (matchCsamKeywords(hint.url)) return null;
     const contentType =
       hint.kind === "photo" ? "image/jpeg" : hint.kind === "gif" ? "image/gif" : hint.kind === "audio" ? "audio/mp4" : "video/mp4";
     return {
@@ -340,13 +347,13 @@ export async function diagnoseDownload(url: string, error: string): Promise<stri
   }
 }
 
-const OWNER_SYSTEM = `أنت Barq AI داخل بوت برق، تتحدث مع المالك فقط بصلاحيات كاملة.
+const OWNER_SYSTEM = `أنت «برق AI» داخل بوت برق، تتحدث مع المالك فقط بصلاحيات كاملة.
 - إذا طلب تنفيذ شيء إداري نفّذه فورًا عبر الأدوات ثم أكّد النتيجة بجملة قصيرة.
 - قناة @barq_all للتحديثات والأخبار والمسابقات. القناة والمجاني والإعلان جاهزة لكن مطفأة حتى يطلب تشغيلها.
 - لا تسأل تأكيدًا إلا إذا كان الأمر إرسالًا جماعيًا أو إيقاف البوت.
 - أجب بالعربية ما لم يكتب بغيرها. كن مباشرًا.
 - لا تكشف مفاتيح API أو توكن البوت.
-- للمستخدمين اسمك برق AI وليس جروك.`;
+- للمستخدمين العاديين اسمك «برق AI» فقط — لا تذكر مزوّدين خارجيين.`;
 
 const OWNER_TOOLS = [
   {
@@ -372,7 +379,7 @@ const OWNER_TOOLS = [
     type: "function",
     function: {
       name: "list_blocked",
-      description: "محاولات التحميل الإباحي المحجوبة",
+      description: "محاولات التحميل المحجوبة (مثل استغلال القُصّر أو قائمة المالك)",
       parameters: {
         type: "object",
         properties: { limit: { type: "integer", minimum: 3, maximum: 30 } },
@@ -770,7 +777,7 @@ async function runOwnerTool(name: string, rawArgs: string, fromId?: number | str
     const key = String(args.key ?? "").trim();
     let value = String(args.value ?? "").trim();
     if (!ALLOWED_GROK_SETTINGS.has(key)) return JSON.stringify({ error: "إعداد غير مسموح" });
-    if (key === "porn_filter") return JSON.stringify({ ok: true, note: "حجب +18 دائم ولا يُوقف" });
+    if (key === "porn_filter") return JSON.stringify({ ok: true, note: "حظر مواقع الإباحية/NSFW + CSAM مفعّل في مسار الاستخراج؛ إعداد اللوحة لا يُطفئه. فلتر الموسيقى متوقف.", value: "on" });
     if (key === "required_channel") {
       const { normalizeChannel } = await import("./brand");
       value = normalizeChannel(value);
@@ -901,13 +908,13 @@ async function ownerChatConfig(): Promise<{
   };
 }
 
-const BARQ_AI_SYSTEM = `أنت برق داخل بوت تليجرام. ترد بالعربية، باختصار، وتفهم الرسالة في سياق البوت كله.
+const BARQ_AI_SYSTEM = `أنت «${BARQ_AI_BRAND}» داخل بوت برق ⚡️ على تليجرام. ترد بالعربية، باختصار، وتفهم الرسالة في سياق البوت كله.
 
 ما يفعله البوت فعلًا:
 - لصق رابط فيديو يحمّل الملف داخل المحادثة. لا ترسل المستخدم لموقع.
-- بعد الملف: قص، تجهيز للنشر، حفظ، مشاركة.
+- بعد الملف: قص، تجهيز للنشر، حفظ، مشاركة، وأزرار برق AI (لخّصه · كابشن · ترجمة عند ظهور زرها).
 - رابط مؤقت مسار منفصل تمامًا: يضغط الزر، يرسل ملفًا، يختار 12 ساعة أو 24 ساعة، ويطلع رابط للملف. لا تخلطه مع التحميل ولا تنشئه من رابط فيديو.
-- لا يوجد تفريغ صوت ولا ترجمة. لا تخترعهما.
+- لا تخترع قدرات غير موجودة. الترجمة/التفريغ فقط من زرها تحت الملف إن ظهر.
 - التحميل مجاني داخل المحادثة. لا تطلب اشتراكًا ولا إعلانًا.
 
 أدواتك:
@@ -917,7 +924,7 @@ const BARQ_AI_SYSTEM = `أنت برق داخل بوت تليجرام. ترد ب�
 - my_jobs لحالة طابوره.
 - bot_guide إذا سأل ماذا يفعل البوت. لا تضف قدرات من عندك.
 
-ممنوع: المحتوى الإباحي، كشف المفاتيح، أوامر المالك، اختلاق مشاهد أو نسب.`;
+ممنوع: المحتوى الإباحي، كشف المفاتيح، أوامر المالك، اختلاق مشاهد أو نسب، وذكر أسماء مزوّدين أو نماذج خارجية.`;
 
 const PUBLIC_AGENT_TOOLS = [
   {
@@ -964,9 +971,9 @@ const PUBLIC_AGENT_TOOLS = [
 
 const BOT_GUIDE = {
   download: "الصق رابط الفيديو. الملف يوصل في المحادثة.",
-  afterFile: ["قص", "تجهيز للنشر", "حفظ", "مشاركة"],
+  afterFile: ["قص", "تجهيز للنشر", "حفظ", "مشاركة", "لخّصه", "كابشن", "ترجمة (عند ظهور الزر)"],
   tempLink: "زر رابط مؤقت ثم ملف ثم 12 أو 24 ساعة. منفصل عن التحميل.",
-  notAvailable: ["تفريغ", "ترجمة", "تحميل من الموقع"],
+  notAvailable: ["تحميل من الموقع"],
 };
 
 async function browsePublicPage(raw: string): Promise<string> {
@@ -1045,14 +1052,14 @@ const publicHistory = new Map<number, ChatMessage[]>();
 export async function askBarqAI(
   userId: number,
   text: string,
-  clip?: { url: string; title?: string; platform?: string },
+  clip?: { url: string; title?: string; description?: string; platform?: string },
   chatId?: number,
 ): Promise<string> {
   if (!aiEnabled()) {
-    return "برق AI متوقف مؤقتًا.";
+    return AI_DISABLED_AR;
   }
   if (!grokReady()) {
-    return "برق AI يتهيأ. الصق رابط الفيديو الآن.";
+    return AI_MISSING_KEY_AR;
   }
   const flightKey = String(userId);
   if (inFlight.has(flightKey)) {
@@ -1069,8 +1076,9 @@ export async function askBarqAI(
       hist = [];
       publicHistory.set(userId, hist);
     }
+    const desc = "description" in (remembered ?? {}) ? (remembered as { description?: string }).description : undefined;
     const context = remembered
-      ? `\nآخر فيديو حمّله المستخدم:\nالرابط: ${remembered.url}\nالمنصة: ${remembered.platform ?? "-"}\nالعنوان: ${remembered.title ?? "-"}`
+      ? `\nآخر فيديو حمّله المستخدم:\nالرابط: ${remembered.url}\nالمنصة: ${remembered.platform ?? "-"}\nالعنوان: ${remembered.title ?? "-"}${desc?.trim() ? `\nالوصف: ${desc.trim().slice(0, 800)}` : ""}`
       : "\nلا يوجد فيديو أخير في هذه الجلسة.";
     hist.push({ role: "user", content: clipAiInput(text) });
     if (hist.length > 10) hist.splice(0, hist.length - 10);
@@ -1126,10 +1134,10 @@ export async function askBarqAI(
 
 export async function askOwnerGrok(text: string, fromId: number | string): Promise<string> {
   if (!aiEnabled()) {
-    return "برق AI متوقف مؤقتًا.";
+    return AI_DISABLED_AR;
   }
   if (!grokReady()) {
-    return "برق AI غير متاح الآن. أوامر الإدارة ما زالت تعمل من لوحة التحكم.";
+    return AI_MISSING_KEY_AR + "\nأوامر الإدارة ما زالت تعمل من لوحة التحكم.";
   }
   const flightKey = String(fromId);
   if (inFlight.has(flightKey)) {

@@ -62,9 +62,9 @@ export function ensureYtDlp(): Promise<string> {
 }
 
 /**
- * DOWNLOAD_TIMEOUT_MS defaults to 900000 (15m) in config.server, but Vercel
- * serverless maxDuration is lower (Hobby 10s, Pro 60s default / 300s max).
- * Cap spawn wait at 900000 so a huge env cannot hang forever. Do not raise
+ * DOWNLOAD_TIMEOUT_MS defaults to 280000 in config.server (Vercel Hobby kills at 300s).
+ * A dedicated worker host may raise it via env; the spawn wait is still capped at
+ * 900000 so a huge env cannot hang forever. Do not raise
  * this spawn timeout above what the platform allows without documenting
  * `maxDuration` in vercel.json.
  */

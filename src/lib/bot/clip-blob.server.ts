@@ -39,18 +39,29 @@ export async function loadClipBlob(): Promise<BlobClip[]> {
 export async function putClipBlob(row: BlobClip): Promise<void> {
   const token = blobToken();
   if (!token) return;
-  const all = await loadClipBlob();
-  const now = Date.now();
-  const next = all.filter((c) => Date.parse(c.expires_at) > now && c.id !== row.id);
-  next.unshift(row);
-  const { put } = await import("@vercel/blob");
-  await put(KEY, JSON.stringify(next.slice(0, 400)), {
-    access: "private",
-    token,
-    allowOverwrite: true,
-    addRandomSuffix: false,
-    contentType: "application/json",
-  });
+  try {
+    const all = await loadClipBlob();
+    const now = Date.now();
+    const next = all.filter((c) => Date.parse(c.expires_at) > now && c.id !== row.id);
+    next.unshift(row);
+    const { put } = await import("@vercel/blob");
+    await put(KEY, JSON.stringify(next.slice(0, 400)), {
+      access: "private",
+      token,
+      allowOverwrite: true,
+      addRandomSuffix: false,
+      contentType: "application/json",
+    });
+  } catch (err) {
+    // Postgres is source of truth when DATABASE_URL is set. Never fail short-link
+    // creation because the optional Blob JSON backup is suspended/unavailable.
+    const { isBlobStoreUnavailable } = await import("./blob-status.server");
+    const why = err instanceof Error ? err.message : "error";
+    console.warn(
+      "[clip-blob] putClipBlob soft-fail:",
+      isBlobStoreUnavailable(err) ? "store unavailable" : why,
+    );
+  }
 }
 
 export async function findClipBlob(id: string): Promise<BlobClip | undefined> {

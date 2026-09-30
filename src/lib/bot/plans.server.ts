@@ -81,5 +81,5 @@ export function youtubeLockedText(): string {
 }
 
 export function aiLockedText(): string {
-  return `Barq AI ضمن ${MAX_PLAN.title} (${MAX_PLAN.sar} ريال = ${MAX_PLAN.stars} نجمة / شهر).`;
+  return `برق AI ضمن ${MAX_PLAN.title} (${MAX_PLAN.sar} ريال = ${MAX_PLAN.stars} نجمة / شهر).`;
 }

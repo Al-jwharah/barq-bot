@@ -1,6 +1,8 @@
 export function workersForLoad(pending: number, cap = 8): number {
   const max = Number.isFinite(cap) && cap > 0 ? Math.min(8, Math.trunc(cap)) : 8;
   if (pending <= 0) return 1;
+  // Single-user path: one claim is enough; avoid empty parallel claims.
+  if (pending <= 2) return Math.min(1, max);
   if (pending <= 4) return Math.min(2, max);
   if (pending <= 15) return Math.min(3, max);
   if (pending <= 40) return Math.min(5, max);

@@ -1,7 +1,10 @@
 import { consumeClip, getClipLink } from "./store.server";
 import { clipDeniedReason, isClipId } from "./clip-id";
 import { isHostedMediaCdn, mediaHeaders } from "../media/http";
-import { assertSafeOutboundUrl } from "../media/ssrf";
+import { assertSafeOutboundUrl, safeFetch, SsrfError } from "../media/ssrf";
+import { TELEGRAM_BOT_TOKEN } from "./config.server";
+import { isTgFileStorageKey, tgFileIdFromStorageKey } from "./blob-status.server";
+import { telegram } from "./telegram.server";
 
 export const CLIP_NOT_FOUND_BODY = "Not Found";
 
@@ -41,6 +44,31 @@ async function streamBlob(key: string, request: Request, access: "public" | "pri
   return new Response(result.stream, { status: range ? 206 : 200, headers: out });
 }
 
+async function streamTelegramFile(fileId: string, request: Request): Promise<Response> {
+  if (!TELEGRAM_BOT_TOKEN) return clipNotFoundResponse();
+  try {
+    const file = await telegram.getFile(fileId);
+    if (!file.file_path) return clipNotFoundResponse();
+    const tgUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+    const range = request.headers.get("range");
+    const res = await fetch(tgUrl, {
+      headers: range ? { Range: range } : undefined,
+    });
+    if (!res.ok && res.status !== 206) return clipNotFoundResponse();
+    const out = new Headers();
+    out.set("Content-Type", res.headers.get("content-type") || "application/octet-stream");
+    out.set("Cache-Control", "private, max-age=60");
+    out.set("X-Content-Type-Options", "nosniff");
+    const cl = res.headers.get("content-length");
+    if (cl) out.set("Content-Length", cl);
+    const cr = res.headers.get("content-range");
+    if (cr) out.set("Content-Range", cr);
+    return new Response(res.body, { status: res.status, headers: out });
+  } catch {
+    return clipNotFoundResponse();
+  }
+}
+
 export async function serveClipById(id: string, request: Request): Promise<Response> {
   if (!isClipId(id)) return clipNotFoundResponse();
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "clip";
@@ -57,6 +85,11 @@ export async function serveClipById(id: string, request: Request): Promise<Respo
   const clip = firstByte ? await consumeClip(id).catch(() => null) : await getClipLink(id).catch(() => null);
   if (!clip || clipDeniedReason(clip)) return clipNotFoundResponse();
   const storageKey = clip.storage_key;
+  if (storageKey && isTgFileStorageKey(storageKey)) {
+    const fileId = tgFileIdFromStorageKey(storageKey);
+    if (!fileId) return clipNotFoundResponse();
+    return streamTelegramFile(fileId, request);
+  }
   if (storageKey) return streamBlob(storageKey, request, "private");
   if (clip.media_url && isBlobStorageUrl(clip.media_url)) {
     return streamBlob(clip.media_url, request, "public");
@@ -76,7 +109,14 @@ async function proxySourceMedia(url: string, request: Request): Promise<Response
   if (!isHostedMediaCdn(url)) return clipNotFoundResponse();
   const range = request.headers.get("range");
   const extra = range ? { Range: range } : undefined;
-  const res = await fetch(url, { headers: mediaHeaders(extra, url) });
+  let res: Response;
+  try {
+    // safeFetch re-validates every redirect hop (SSRF) — plain fetch does not.
+    res = await safeFetch(url, { headers: mediaHeaders(extra, url), maxRedirects: 3, timeoutMs: 20000 });
+  } catch (err) {
+    if (err instanceof SsrfError) return clipNotFoundResponse();
+    return clipNotFoundResponse();
+  }
   if (!res.ok && res.status !== 206) return clipNotFoundResponse();
   const out = new Headers();
   out.set("Content-Type", res.headers.get("content-type") || "video/mp4");

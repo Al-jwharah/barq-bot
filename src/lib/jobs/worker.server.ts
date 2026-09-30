@@ -7,8 +7,10 @@ import {
   assertSafeMedia,
   deliver,
   handleBlocked,
+  offerAudioOnly,
   sendAfterDownload,
   sendPlayCard,
+  sendQualityPicker,
 } from "../bot/handle.server";
 import { MediaBlockedError } from "../bot/safety";
 import { logEvent, requestId } from "../bot/observability.server";
@@ -52,11 +54,12 @@ const REQUEST_CONTEXT = Symbol.for("@vercel/request-context");
 
 /**
  * Executor honesty:
- * Vercel serverless + `waitUntil` is the current executor (`/api/jobs`, `/api/keep`,
- * webhook kick via `@vercel/functions`). A dedicated always-on worker process is
- * NOT deployed. Public launch is blocked until that worker exists.
+ * Default (BARQ_EXTERNAL_WORKER off): Vercel serverless + `waitUntil` runs drain
+ * (`/api/jobs`, `/api/keep`, webhook kick via `@vercel/functions`).
+ * Architecture B (BARQ_EXTERNAL_WORKER=on): dedicated always-on worker outside Vercel
+ * (`src/worker/main.ts` on Fly/Railway/Docker) claims `download_jobs`; Vercel
+ * kick is a light wake POST to WORKER_WAKE_URL (or poll no-op). See WORKER.md.
  * `MAX_CONCURRENT_JOBS` env is honored when set; otherwise concurrency is 3.
- * This module runs inside the serverless request — it is not a separate process.
  *
  * `@vercel/functions` waitUntil is a silent no-op when
  * `Symbol.for("@vercel/request-context")` is missing (Nitro/TanStack Start).
@@ -86,7 +89,7 @@ async function editStatus(chatId: number, messageId: number | null, text: string
   await telegram.editMessageText(chatId, messageId, text).catch(() => undefined);
 }
 
-/** Outer bound: DOWNLOAD_TIMEOUT_MS (default 900000). Kills yt-dlp/ffmpeg via proc-registry. */
+/** Outer bound: DOWNLOAD_TIMEOUT_MS (default 280000, under Vercel Hobby 300s). Kills yt-dlp/ffmpeg via proc-registry. */
 async function withDeadline<T>(jobId: string, ms: number, fn: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let settled = false;
@@ -155,11 +158,11 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
       const { setLastClip } = await import("../bot/session.server");
       setLastClip(fromId, { url: job.url, kind: hit.kind === "audio" ? "audio" : "video", fileId: fid });
     }
-    await sendAfterDownload(chatId);
+    await sendAfterDownload(chatId, fromId);
     if (await applyJobQuota(job.id)) {
       await bumpDownload(fromId);
       const { bumpDownloadOk } = await import("../bot/growth.server");
-      await bumpDownloadOk(fromId).catch(() => undefined);
+      await bumpDownloadOk(fromId, chatId).catch(() => undefined);
       emit("download.completed", { tgId: fromId, url: job.url });
     }
     await logDownload({ tgId: fromId, url: job.url, ok: true, platform: "cache" });
@@ -176,8 +179,43 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   result = forceTikTokFile(result);
   await saveExtractCache(job.url, result).catch(() => undefined);
   await assertSafeMedia(job.url, result);
-  const live = await getJob(job.id);
+  const { QUALITY_PICKER } = await import("../bot/config.server");
+  // Quality picker / audio-only offer are opt-in (BARQ_QUALITY_PICKER=on): default is the fast direct file.
+  const stampTask = (async () => {
+    if (!QUALITY_PICKER) return false;
+    const { isOwnerId } = await import("../bot/config.server");
+    if (isOwnerId(fromId)) return false;
+    const { getMember: loadMember } = await import("../bot/store.server");
+    const { downloadAccess } = await import("../bot/settings.server");
+    const member = await loadMember(fromId);
+    const quota = member ? await downloadAccess(member) : { subscribed: false };
+    return !quota.subscribed;
+  })();
+  const [stamp, live] = await Promise.all([stampTask, getJob(job.id)]);
   if (live?.status === "cancelled") throw new Error("cancelled");
+
+  const picked = QUALITY_PICKER
+    ? await sendQualityPicker(chatId, fromId, result, stamp).catch(() => false)
+    : false;
+  if (picked) {
+    if (await applyJobQuota(job.id)) {
+      await bumpDownload(fromId);
+      const { bumpDownloadOk } = await import("../bot/growth.server");
+      await bumpDownloadOk(fromId, chatId).catch(() => undefined);
+      emit("download.completed", { tgId: fromId, url: job.url });
+    }
+    await logDownload({
+      tgId: fromId,
+      url: job.url,
+      platform: result.platform,
+      ok: true,
+      title: result.title ?? result.text,
+    }).catch(() => undefined);
+    markProcessed();
+    if (mid) await telegram.deleteMessage(chatId, mid).catch(() => undefined);
+    return "ok";
+  }
+
   await markJobUploading(job.id).catch(() => undefined);
   await editStatus(chatId, mid, progressStatus("upload"));
   let ids: number[] = [];
@@ -207,16 +245,17 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     },
   }).catch(() => undefined);
   await sendPlayCard(chatId, fromId, result).catch(() => undefined);
+  if (QUALITY_PICKER) await offerAudioOnly(chatId, fromId, result, stamp).catch(() => undefined);
   if (await applyJobQuota(job.id)) {
     await bumpDownload(fromId);
     const { bumpDownloadOk } = await import("../bot/growth.server");
-    await bumpDownloadOk(fromId).catch(() => undefined);
+    await bumpDownloadOk(fromId, chatId).catch(() => undefined);
     emit("download.completed", { tgId: fromId, url: job.url });
   }
   await logDownload({ tgId: fromId, url: job.url, platform: result.platform, ok: true });
   markProcessed();
   if (mid) await telegram.deleteMessage(chatId, mid).catch(() => undefined);
-  await sendAfterDownload(chatId);
+  await sendAfterDownload(chatId, fromId);
   return "ok";
 }
 
@@ -285,6 +324,9 @@ export async function processDownloadJob(id?: string): Promise<{ id?: string; st
     const shown = userFailMessage(technical);
     const next = await retryOrFail(job, technical);
     markError(technical);
+    if (next === "failed") {
+      await import("../bot/sentry.server").then((m) => m.captureError(err, "processDownloadJob")).catch(() => undefined);
+    }
     await logDownload({ tgId: fromId, url: job.url, ok: false, reason: technical.slice(0, 180) }).catch(() => undefined);
     if (next === "failed") {
       const { isRetryableError } = await import("./retry-policy");
@@ -345,10 +387,25 @@ export async function drainJobs(max?: number) {
     const { jobStats } = await import("./queue.server");
     pending = (await jobStats()).pending;
   } catch {
-    pending = 3;
+    pending = 1;
   }
   const auto = workersForLoad(pending, cap);
   const requested = max != null && Number.isFinite(max) && max > 0 ? Math.trunc(max) : auto;
+  // Hard ceiling 8: allow keep(8) / jobs(~5); pool max≈4 + 503 on exhaustion.
   const limit = Math.max(1, Math.min(8, requested));
-  return Promise.all(Array.from({ length: limit }, () => processDownloadJob()));
+  const { isDbOverloadError } = await import("@/lib/db");
+  const settled = await Promise.allSettled(Array.from({ length: limit }, () => processDownloadJob()));
+  const results: Array<{ id?: string; status: string; error?: string }> = [];
+  for (const s of settled) {
+    if (s.status === "fulfilled") {
+      results.push(s.value);
+      continue;
+    }
+    if (isDbOverloadError(s.reason)) throw s.reason;
+    results.push({
+      status: "error" as const,
+      error: s.reason instanceof Error ? s.reason.message.slice(0, 80) : "drain",
+    });
+  }
+  return results;
 }

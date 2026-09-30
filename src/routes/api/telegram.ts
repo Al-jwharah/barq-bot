@@ -3,8 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { flushDb } from "@/lib/db";
 import { handleUpdate } from "@/lib/bot/handle.server";
 import { guardTelegramRequest } from "@/lib/bot/webhook-guard";
-import { inlineKeyboard, telegram, urlsFromMessage } from "@/lib/bot/telegram.server";
-import { enqueueDownload, kickJobWorker, setJobStatusMessage } from "@/lib/jobs/queue.server";
+import { initSentry } from "@/lib/bot/sentry.server";
 
 function later(task: Promise<unknown>): Promise<unknown> {
   try {
@@ -34,58 +33,29 @@ export const Route = createFileRoute("/api/telegram")({
       DELETE: methodNotAllowed,
       OPTIONS: methodNotAllowed,
       POST: async ({ request }) => {
+        initSentry();
         const raw = await request.text();
         const guarded = guardTelegramRequest(request, raw);
         if (!guarded.ok) {
           return new Response(guarded.body, { status: guarded.status });
         }
-        const msg = guarded.update.message;
-        const fromId = msg ? (msg.from?.id ?? msg.chat.id) : 0;
-        let linkCap = 3;
-        if (msg) {
-          const { hasPremium } = await import("@/lib/bot/plans.server");
-          const { getMember } = await import("@/lib/bot/store.server");
-          const member = await getMember(fromId).catch(() => null);
-          if (hasPremium(member, fromId)) linkCap = 5;
-        }
-        const batch = msg ? [...new Set(urlsFromMessage(msg))].slice(0, linkCap) : [];
-        if (msg && batch.length > 1) {
-          const found = urlsFromMessage(msg).length;
-          await telegram
-            .sendMessage(
-              msg.chat.id,
-              found > linkCap
-                ? `وصلت ${found} روابط. أجهّز أول ${linkCap}، كل واحد لحاله.`
-                : `وصلت ${batch.length} روابط. أجهّزها واحد واحد.`,
-            )
-            .catch(() => undefined);
-        }
+        // Multi-link messages (3 free / 5 premium) are fanned out inside handleUpdate
+        // so every link passes the same ban / safety / quota checks as a single link.
         await handleUpdate(guarded.update).catch(() => undefined);
-        if (msg && batch.length > 1) {
-          const fromId = msg.from?.id ?? msg.chat.id;
-          for (const url of batch.slice(1)) {
-            const queued = await enqueueDownload({ tgId: fromId, chatId: msg.chat.id, url }).catch(() => null);
-            if (!queued || queued.denied || queued.reused) continue;
-            const status = await telegram
-              .sendMessage(msg.chat.id, "⚡ استلمت الرابط ✅", {
-                reply_markup: inlineKeyboard([
-                  [
-                    { text: "إلغاء التحميل", callback_data: `job:cancel:${queued.job.id}` },
-                    { text: "طابوري", callback_data: "lib:queue" },
-                  ],
-                ]),
-              })
-              .catch(() => null);
-            if (status?.message_id) {
-              await setJobStatusMessage(queued.job.id, status.message_id).catch(() => undefined);
-            }
-            await kickJobWorker(queued.job.id).catch(() => undefined);
-          }
-        }
+        // Hobby cron for /api/keep is daily-only. Drain first for snappy single-user path,
+        // then reclaim (cooldown-guarded) so stuck rows do not block the new job.
+        // Deep queues continue via /api/jobs self-kick.
+        // Dedicated always-on worker still recommended for launch.
         await later(
           (async () => {
             const { drainJobs } = await import("@/lib/jobs/worker.server");
-            await drainJobs();
+            await drainJobs(3);
+            const { reclaimStuckJobs, jobStats, kickJobWorker } = await import("@/lib/jobs/queue.server");
+            await reclaimStuckJobs().catch(() => undefined);
+            const stats = await jobStats().catch(() => null);
+            if (stats && stats.pending > 0) {
+              await kickJobWorker().catch(() => undefined);
+            }
           })().finally(() => flushDb().catch(() => undefined)),
         );
         return new Response("ok");

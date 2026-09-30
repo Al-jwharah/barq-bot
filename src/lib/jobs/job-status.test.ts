@@ -55,14 +55,14 @@ test("errorMessageSafe strips secrets and urls", () => {
   assert.equal(errorCodeOf("provider temp"), "provider_temp");
 });
 
-test("DOWNLOAD_TIMEOUT_MS defaults to 900000", () => {
+test("DOWNLOAD_TIMEOUT_MS defaults to 280000 (under Vercel Hobby 300s)", () => {
   const prev = process.env.DOWNLOAD_TIMEOUT_MS;
   delete process.env.DOWNLOAD_TIMEOUT_MS;
-  assert.equal(jobTimeoutMs(), 900000);
+  assert.equal(jobTimeoutMs(), 280000);
   process.env.DOWNLOAD_TIMEOUT_MS = "120000";
   assert.equal(jobTimeoutMs(), 120000);
   process.env.DOWNLOAD_TIMEOUT_MS = "0";
-  assert.equal(jobTimeoutMs(), 900000);
+  assert.equal(jobTimeoutMs(), 280000);
   if (prev == null) delete process.env.DOWNLOAD_TIMEOUT_MS;
   else process.env.DOWNLOAD_TIMEOUT_MS = prev;
 });

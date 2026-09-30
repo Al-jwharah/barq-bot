@@ -300,10 +300,51 @@ async function extractCobalt(url: string, id: string): Promise<ExtractResult | n
   return null;
 }
 
+const TELEGRAM_SOFT_CAP = 45 * 1024 * 1024;
+
+/** Prefer variants under Telegram cloud cap; only throw when every known size is over. */
+function fitYouTubeForTelegram(result: ExtractResult): ExtractResult {
+  const item = result.items[0];
+  if (!item) return result;
+  const variants = item.variants?.length
+    ? [...item.variants]
+    : item.url
+      ? [{ url: item.url, quality: "أصل", contentType: "video/mp4", size: undefined as number | undefined }]
+      : [];
+  const knownOver = variants.filter((v) => typeof v.size === "number" && v.size > 0 && v.size > TELEGRAM_SOFT_CAP);
+  const under = variants.filter((v) => !(typeof v.size === "number" && v.size > 0 && v.size > TELEGRAM_SOFT_CAP));
+  if (under.length === 0 && knownOver.length > 0) {
+    const mins = Math.max(1, Math.round((item.duration ?? 0) / 60));
+    throw new Error(
+      `هذا المقطع ${mins} دقيقة وأكبر من حد تليجرام (50 ميغابايت). أرسل شورتس أو فيديو أقصر.`,
+    );
+  }
+  const ranked = (under.length ? under : variants).sort(
+    (a, b) =>
+      (a.size ?? Number.MAX_SAFE_INTEGER) - (b.size ?? Number.MAX_SAFE_INTEGER) ||
+      (a.height ?? 9999) - (b.height ?? 9999),
+  );
+  const best = ranked[0]!;
+  return {
+    ...result,
+    items: [
+      {
+        ...item,
+        url: best.url,
+        width: best.width ?? item.width,
+        height: best.height ?? item.height,
+        variants: ranked,
+      },
+      ...result.items.slice(1),
+    ],
+  };
+}
+
 export async function extractYouTube(url: string): Promise<ExtractResult> {
   const id = youtubeIdFromUrl(url);
   if (!id) throw new Error("هذا مو رابط يوتيوب واضح");
   const watch = `https://www.youtube.com/watch?v=${id}`;
+  const finish = (result: ExtractResult) => fitYouTubeForTelegram(result);
   const fast = CLIENTS.slice(0, 3).map(async (client) => {
     const player = await innertube(id, client);
     if (player.playabilityStatus?.status === "LOGIN_REQUIRED") return null;
@@ -314,11 +355,11 @@ export async function extractYouTube(url: string): Promise<ExtractResult> {
     ...fast,
     extractCobalt(watch, id),
   ]);
-  if (raced) return raced;
+  if (raced) return finish(raced);
   const piped = await extractPiped(id);
-  if (piped) return piped;
+  if (piped) return finish(piped);
   const inv = await extractInvidious(id);
-  if (inv) return inv;
+  if (inv) return finish(inv);
   // Last path: yt-dlp with the Node runtime. Used when the Android client and
   // the public Piped/Invidious/Cobalt mirrors are blocked or empty.
   const { extractWithYtdlp } = await import("../ytdlp");

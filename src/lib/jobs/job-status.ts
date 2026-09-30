@@ -38,8 +38,8 @@ export function assertTransition(from: JobStatus, to: JobStatus): void {
 
 /** Default 15 minutes. Outer bound for yt-dlp/ffmpeg; stuck reclaim uses the same window. */
 export function jobTimeoutMs(): number {
-  const n = Number(process.env.DOWNLOAD_TIMEOUT_MS ?? 900000);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 900000;
+  const n = Number(process.env.DOWNLOAD_TIMEOUT_MS ?? 280000);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 280000;
 }
 
 /** Job owner or bot owner may cancel an in-flight job. Nobody else. */

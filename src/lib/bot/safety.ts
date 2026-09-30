@@ -1,6 +1,6 @@
 export type PornVerdict = {
   block: boolean;
-  kind: "porn_film" | "nsfw" | "music" | "women" | "comedy" | "news" | "mainstream" | "other" | "domain";
+  kind: "porn_film" | "nsfw" | "music" | "women" | "comedy" | "news" | "mainstream" | "other" | "domain" | "csam";
   confidence: number;
   evidence: string;
 };
@@ -9,7 +9,7 @@ export class MediaBlockedError extends Error {
   evidence: string;
   kind: string;
 
-  constructor(message: string, evidence: string, kind = "porn_film") {
+  constructor(message: string, evidence: string, kind = "other") {
     super(message);
     this.name = "MediaBlockedError";
     this.evidence = evidence;
@@ -17,11 +17,13 @@ export class MediaBlockedError extends Error {
   }
 }
 
+/** User-facing purpose: general video downloader (music allowed; adult tube sites blocked). */
 export const BOT_PURPOSE =
-  "عذرًا، لا يمكن تحميل هذا المقطع.\n\nهذا البوت مخصّص فقط لـ:\n• المقاطع الإسلامية والدينية\n• القصص النافعة\n• مقاطع الضحك الخالية من الموسيقى\n\nيُمنع: الأغاني والموسيقى، ومحتوى الحريم، وأي إباحي أو +18.";
+  "برق ⚡️ لتحميل الفيديو\n\nالصق الرابط ويصلك الملف.\nيدعم يوتيوب وتيك توك وإنستغرام وإكس وغيرها.";
 
 const PORN_TLDS = new Set(["xxx", "sex", "porn", "adult"]);
 
+/** Existing adult-tube / NSFW hosting blocklist — checked BEFORE extract/download. */
 const PORN_DOMAINS = new Set([
   "pornhub.com",
   "pornhub.org",
@@ -83,6 +85,17 @@ const PORN_DOMAINS = new Set([
   "xnxx-cdn.com",
 ]);
 
+const STUDIO_RE =
+  /\b(brazzers|bangbros|reality[\s-]?kings|digital[\s-]?playground|vixen\b|blacked\b|tushy\b|naughty[\s-]?america|bellesa|deeper\.com|pornpros|fake[\s-]?taxi)\b/i;
+
+const FILM_RE =
+  /\b((full\s+)?porn(ographic)?\s*(movie|film|video)|xxx\s*(movie|film)|adult\s+(film|movie|content)|nsfw|onlyfans|fansly|18\+|age[-\s]?restricted)\b/i;
+
+/** Owner lock: porn keyword filter is NOT narrowed (kept as in production). */
+// "+18" needs the plus sign: a bare 18 matched ids/years in URLs (e.g. Suno song ids, 2018).
+const AR_FILM_RE = /فيلم\s*(سكس|إباحي|اباحي|بورن)|بورن|مقطع\s*إباحي|سكس|إباحي|اباحي|\+\s*18|18\s*\+/;
+
+/** Owner lock: music / women matchers are kept intact (not wired into the download path, same as production). */
 const MUSIC_DOMAINS = new Set([
   "soundcloud.com",
   "on.soundcloud.com",
@@ -96,14 +109,6 @@ const MUSIC_DOMAINS = new Set([
   "bandcamp.com",
 ]);
 
-const STUDIO_RE =
-  /\b(brazzers|bangbros|reality[\s-]?kings|digital[\s-]?playground|vixen\b|blacked\b|tushy\b|naughty[\s-]?america|bellesa|deeper\.com|pornpros|fake[\s-]?taxi)\b/i;
-
-const FILM_RE =
-  /\b((full\s+)?porn(ographic)?\s*(movie|film|video)|xxx\s*(movie|film)|adult\s+(film|movie|content)|nsfw|onlyfans|fansly|18\+|age[-\s]?restricted)\b/i;
-
-const AR_FILM_RE = /فيلم\s*(سكس|إباحي|اباحي|بورن)|بورن|مقطع\s*إباحي|سكس|إباحي|اباحي|\+?\s*18/;
-
 const MUSIC_RE =
   /\b(official\s+audio|music\s+video|lyrics|remix|cover\s+song|\bmp3\b|spotify|soundcloud)\b/i;
 
@@ -113,6 +118,29 @@ const WOMEN_RE =
   /\b(thirst\s*trap|bikini|lingerie|hot\s+girl|only\s*fans|girl\s*dance)\b/i;
 
 const AR_WOMEN_RE = /حريم|رقص\s*بنات|بنات\s*تيك|فيديوهات\s*بنات|خليجي\s*رقص|رقص\s*شرقي|مقاطع\s*بنات/;
+
+/** Mainstream platforms: never block on porn keywords (CSAM still blocked). Domain blocklist is separate. */
+const MAINSTREAM_DOMAINS = [
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+  "instagram.com",
+  "facebook.com",
+  "fb.watch",
+  "x.com",
+  "twitter.com",
+  "reddit.com",
+  "vimeo.com",
+  "snapchat.com",
+  "threads.net",
+];
+
+/** Only underage / CSAM material remains auto-ban + hard-block. */
+const CSAM_RE =
+  /\b(csam|child\s*porn|child\s*sex(?:ual)?|underage\s*(?:sex|porn|nude)|pedo(?:phile|philia)?|preteen\s*(?:sex|porn)|infant\s*porn)\b/i;
+
+const AR_CSAM_RE =
+  /إباحي[ةه]?\s*(أطفال|قاصر|قصّر)|استغلال\s*(جنسي)?\s*(أطفال|قاصر)|مواد\s*(جنسي[ةه]?\s*)?(أطفال|قاصر)|تصوير\s*قاصر/;
 
 function hostnameOf(url: string): string | null {
   try {
@@ -124,6 +152,15 @@ function hostnameOf(url: string): string | null {
 
 function hostMatchesDomain(host: string, domain: string): boolean {
   return host === domain || host.endsWith(`.${domain}`);
+}
+
+function isMainstreamHost(url: string): boolean {
+  const host = hostnameOf(url);
+  if (!host) return false;
+  for (const domain of MAINSTREAM_DOMAINS) {
+    if (hostMatchesDomain(host, domain)) return true;
+  }
+  return false;
 }
 
 export function matchPornDomain(url: string): { domain: string } | null {
@@ -178,14 +215,28 @@ export function matchWomenKeywords(text: string): string | null {
   return null;
 }
 
-export function isBanKind(kind: string): boolean {
-  return kind === "porn_film" || kind === "nsfw" || kind === "domain";
+export function matchCsamKeywords(text: string): string | null {
+  const sample = text.slice(0, 2400);
+  if (CSAM_RE.test(sample) || AR_CSAM_RE.test(sample)) {
+    return "محتوى يشتبه باستغلال قاصر — محظور.";
+  }
+  return null;
 }
 
-export function userBlockMessage(_kind = "other"): string {
+/** Auto-ban for CSAM and clear adult-tube / NSFW hits. Music/women never ban. */
+export function isBanKind(kind: string): boolean {
+  return kind === "csam" || kind === "porn_film" || kind === "nsfw" || kind === "domain";
+}
+
+export function userBlockMessage(kind = "other"): string {
+  if (kind === "csam") return "هذا المحتوى محظور (حماية القُصّر).";
+  if (kind === "domain" || kind === "porn_film" || kind === "nsfw") {
+    return "هذا الرابط محظور — مواقع ومحتوى إباحي غير مسموح.";
+  }
   return "";
 }
 
+/** Porn/NSFW domain verdicts only — music domains intentionally not blocked. */
 export function domainVerdict(url: string): PornVerdict | null {
   const porn = matchPornDomain(url);
   if (porn) {
@@ -194,15 +245,6 @@ export function domainVerdict(url: string): PornVerdict | null {
       kind: "domain",
       confidence: 1,
       evidence: `الموقع ${porn.domain} مخصّص للمحتوى الإباحي.`,
-    };
-  }
-  const music = matchMusicDomain(url);
-  if (music) {
-    return {
-      block: true,
-      kind: "music",
-      confidence: 1,
-      evidence: `الموقع ${music.domain} مخصّص للأغاني والموسيقى.`,
     };
   }
   return null;
@@ -218,19 +260,45 @@ export function metadataVerdict(input: {
   const blob = [input.url, input.title, input.text, input.author, input.platform]
     .filter(Boolean)
     .join("\n");
+  const csam = matchCsamKeywords(blob);
+  if (csam) {
+    return { block: true, kind: "csam", confidence: 1, evidence: csam };
+  }
+  // Mainstream hosts: never block on porn keywords (religious/educational mentions of الإباحية etc.).
+  // CSAM above still applies; PORN_DOMAINS never matches these hosts.
+  if (isMainstreamHost(input.url)) {
+    return null;
+  }
   const porn = matchPornKeywords(blob);
   if (porn) {
     return { block: true, kind: "nsfw", confidence: 0.95, evidence: porn };
   }
-  const music = matchMusicKeywords(blob);
-  if (music) {
-    return { block: true, kind: "music", confidence: 0.9, evidence: music };
-  }
-  const women = matchWomenKeywords(blob);
-  if (women) {
-    return { block: true, kind: "women", confidence: 0.9, evidence: women };
-  }
   return null;
+}
+
+/**
+ * Sync gate used BEFORE extractMedia / yt-dlp download.
+ * Domain + URL-keyword + CSAM checks only — does not rewrite platform extractors.
+ */
+export function assertPreExtractBlocklist(url: string): void {
+  const domain = domainVerdict(url);
+  if (domain?.block) {
+    throw new MediaBlockedError(userBlockMessage(domain.kind), domain.evidence, domain.kind);
+  }
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    decoded = url;
+  }
+  const meta = metadataVerdict({ url: decoded });
+  if (meta?.block) {
+    throw new MediaBlockedError(
+      meta.kind === "csam" ? userBlockMessage("csam") : userBlockMessage(meta.kind),
+      meta.evidence,
+      meta.kind,
+    );
+  }
 }
 
 export function parseGrokVerdict(raw: string): PornVerdict | null {
@@ -246,7 +314,25 @@ export function parseGrokVerdict(raw: string): PornVerdict | null {
       evidence_ar?: unknown;
       evidence?: unknown;
     };
-    const kindRaw = typeof parsed.kind === "string" ? parsed.kind : "other";
+    const kindRaw = typeof parsed.kind === "string" ? parsed.kind.toLowerCase() : "other";
+    const confidence = Number(parsed.confidence);
+    const evidence =
+      (typeof parsed.evidence_ar === "string" && parsed.evidence_ar.trim()) ||
+      (typeof parsed.evidence === "string" && parsed.evidence.trim()) ||
+      "";
+    const isCsam =
+      kindRaw === "csam" ||
+      kindRaw === "child" ||
+      kindRaw === "underage" ||
+      kindRaw === "child_porn";
+    if (parsed.block === true && isCsam && confidence >= 0.7) {
+      return {
+        block: true,
+        kind: "csam",
+        confidence,
+        evidence: evidence || "محتوى يشتبه باستغلال قاصر.",
+      };
+    }
     const kind: PornVerdict["kind"] =
       kindRaw === "porn_film" ||
       kindRaw === "nsfw" ||
@@ -255,38 +341,38 @@ export function parseGrokVerdict(raw: string): PornVerdict | null {
       kindRaw === "comedy" ||
       kindRaw === "news" ||
       kindRaw === "mainstream" ||
-      kindRaw === "domain"
-        ? kindRaw
+      kindRaw === "domain" ||
+      kindRaw === "csam"
+        ? (kindRaw as PornVerdict["kind"])
         : "other";
-    const confidence = Number(parsed.confidence);
-    const evidence =
-      (typeof parsed.evidence_ar === "string" && parsed.evidence_ar.trim()) ||
-      (typeof parsed.evidence === "string" && parsed.evidence.trim()) ||
-      "";
-    const blockedKind =
+    const pornBlock =
       kind === "porn_film" ||
       kind === "nsfw" ||
-      kind === "music" ||
-      kind === "women" ||
       kind === "domain" ||
       kindRaw === "adult" ||
       kindRaw === "18+";
-    const block = parsed.block === true && blockedKind && confidence >= 0.5;
-    if (!block) {
+    // Owner lock: same thresholds as production (>=0.5); music/women verdicts still block (never ban).
+    const softBlock = kind === "music" || kind === "women";
+    if (parsed.block === true && (pornBlock || softBlock) && confidence >= 0.5) {
       return {
-        block: false,
-        kind,
-        confidence: Number.isFinite(confidence) ? confidence : 0,
-        evidence: evidence || "مسموح ضمن تخصص البوت.",
+        block: true,
+        kind: pornBlock ? (kind === "domain" || kind === "porn_film" || kind === "nsfw" ? kind : "nsfw") : kind,
+        confidence,
+        evidence: evidence || (pornBlock ? "محتوى إباحي محظور." : "خارج تخصص البوت."),
       };
     }
     return {
-      block: true,
-      kind: blockedKind && kind !== "comedy" && kind !== "news" && kind !== "mainstream" ? kind : "nsfw",
-      confidence,
-      evidence: evidence || "خارج تخصص البوت.",
+      block: false,
+      kind,
+      confidence: Number.isFinite(confidence) ? confidence : 0,
+      evidence: evidence || "مسموح.",
     };
   } catch {
     return null;
   }
+}
+
+/** Unused helper kept so hostnameOf is not tree-shaken oddly in tests. */
+export function _safeHost(url: string): string | null {
+  return hostnameOf(url);
 }

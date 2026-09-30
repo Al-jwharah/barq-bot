@@ -44,8 +44,9 @@ test("حسابي => account", () => {
   assert.equal(classifyIntent({ text: "حسابي", urls: [], hasFile: false }), "account");
 });
 
-test("Barq AI => ai", () => {
+test("Barq AI / برق AI => ai", () => {
   assert.equal(classifyIntent({ text: "Barq AI", urls: [], hasFile: false }), "ai");
+  assert.equal(classifyIntent({ text: "برق AI", urls: [], hasFile: false }), "ai");
 });
 
 test("لخّصه / كابشن => ai", () => {
@@ -67,4 +68,25 @@ test("رفع ملف is not a download", () => {
 
 test("hello => other", () => {
   assert.equal(classifyIntent({ text: "hello", urls: [], hasFile: false }), "other");
+});
+
+test("/ai لخص => ai", () => {
+  assert.equal(classifyIntent({ text: "/ai لخص المقطع", urls: [], hasFile: false }), "ai");
+});
+
+test("/grok => ai", () => {
+  assert.equal(classifyIntent({ text: "/grok", urls: [], hasFile: false }), "ai");
+});
+
+test("اختصار / رابط مختصر => short", () => {
+  assert.equal(classifyIntent({ text: "اختصار", urls: [], hasFile: false }), "short");
+  assert.equal(classifyIntent({ text: "رابط مختصر", urls: [], hasFile: false }), "short");
+  assert.equal(classifyIntent({ text: "/اختصار", urls: [], hasFile: false }), "short");
+});
+
+test("isShortCommand aliases", async () => {
+  const { isShortCommand } = await import("./router.ts");
+  assert.equal(isShortCommand("اختصار"), true);
+  assert.equal(isShortCommand("رابط مختصر"), true);
+  assert.equal(isShortCommand("مرحبا"), false);
 });

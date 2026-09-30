@@ -111,18 +111,21 @@ export async function recallClip(tgId: number) {
       updated_at timestamptz not null default now()
     )
   `;
-  const rows = await sql<{ payload: { url?: string; title?: string; platform?: string; mediaUrl?: string; thumbnail?: string; kind?: string } }>`
+  const rows = await sql<{ payload: Partial<import("./session.server").LastClip> }>`
     select payload from last_clips where tg_id = ${String(tgId)} limit 1
   `;
   const row = rows[0]?.payload;
   if (!row?.url) return undefined;
-  const clip = {
+  const clip: import("./session.server").LastClip = {
     url: row.url,
     title: row.title,
+    description: row.description,
     platform: row.platform,
     mediaUrl: row.mediaUrl,
     thumbnail: row.thumbnail,
     kind: row.kind,
+    fileId: row.fileId,
+    duration: row.duration,
   };
   setLastClip(tgId, clip);
   return clip;
@@ -180,10 +183,11 @@ export type HistoryRow = {
   created_at: string;
 };
 
-export async function listHistory(tgId: number, limit = 20): Promise<HistoryRow[]> {
+/** Last 20+ successful downloads (Postgres). Cap 30. */
+export async function listHistory(tgId: number, limit = 25): Promise<HistoryRow[]> {
   const sql = await getSql();
   await ensure(sql);
-  const cap = Math.min(Math.max(limit, 1), 20);
+  const cap = Math.min(Math.max(limit, 1), 30);
   return sql<HistoryRow>`
     select id, url, platform, title, created_at::text
     from download_logs
@@ -199,7 +203,7 @@ export async function searchHistory(tgId: number, query: string, limit = 20): Pr
   const sql = await getSql();
   await ensure(sql);
   const like = `%${q.replace(/[%_]/g, "")}%`;
-  const cap = Math.min(Math.max(limit, 1), 20);
+  const cap = Math.min(Math.max(limit, 1), 30);
   return sql<HistoryRow>`
     select id, url, platform, title, created_at::text
     from download_logs

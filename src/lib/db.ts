@@ -218,7 +218,26 @@ function postgresPoolOptions(connectionString: string, max: number) {
   } catch {
     /* keep original */
   }
-  return { connectionString: url, max };
+  return {
+    connectionString: url,
+    max,
+    // Fail fast under saturation instead of hanging the serverless isolate.
+    connectionTimeoutMillis: 4_000,
+    // Short idle so serverless isolates release Neon sessions quickly.
+    idleTimeoutMillis: 5_000,
+    allowExitOnIdle: true,
+    // Avoid startup `options` (statement_timeout) — Neon session poolers often reject them.
+  };
+}
+
+/** Neon session pool_size≈15 across isolates. Cap per-isolate clients; env override. */
+function neonPoolMax(): number {
+  const raw = process.env.BARQ_PG_POOL_MAX;
+  if (raw != null && String(raw).trim() !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 1) return Math.min(8, Math.trunc(n));
+  }
+  return 4;
 }
 
 function createNeonSql(): Promise<Sql> {
@@ -229,7 +248,8 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool(postgresPoolOptions(databaseUrl!, 4));
+    // Mild concurrency for single-user snappy path; 503 on true pool exhaustion.
+    const pool = new Pool(postgresPoolOptions(databaseUrl!, neonPoolMax()));
     globalRef.__pgPool__ = pool;
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
@@ -393,6 +413,39 @@ export async function withTransaction<T>(fn: (sql: Sql) => Promise<T>): Promise<
   } finally {
     client.release();
   }
+}
+
+
+/**
+ * True when Postgres/pool refused or timed out work — callers should 503 + Retry-After.
+ * Walks `cause` (pg / Neon wraps FATAL under Error.cause).
+ */
+export function isDbOverloadError(err: unknown): boolean {
+  let cur: unknown = err;
+  for (let depth = 0; cur != null && depth < 5; depth += 1) {
+    const code = String((cur as { code?: string })?.code ?? "");
+    const msg = cur instanceof Error ? cur.message : String(cur);
+    if (
+      code === "53300" ||
+      code === "53400" ||
+      code === "57P03" ||
+      code === "ETIMEDOUT" ||
+      code === "ECONNREFUSED" ||
+      code === "ECONNRESET"
+    ) {
+      return true;
+    }
+    // Neon session pooler: EMAXCONNSESSION often arrives as FATAL XX000
+    if (
+      /EMAXCONNSESSION|max clients reached|remaining connection slots|MaxClientsInSessionMode|too many clients|sorry, too many clients|pool_size|timeout exceeded when trying to connect|connection.*timeout|timeout expired|Connection terminated|pool.*timeout|could not connect|ECONNREFUSED|ETIMEDOUT|ECONNRESET|connect ETIMEDOUT/i.test(
+        msg,
+      )
+    ) {
+      return true;
+    }
+    cur = (cur as { cause?: unknown })?.cause;
+  }
+  return false;
 }
 
 /**

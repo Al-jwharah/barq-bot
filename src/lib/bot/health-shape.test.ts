@@ -12,3 +12,8 @@ test("public health JSON never interpolates secret env values", () => {
   assert.equal(/process\.env\.XAI_API_KEY/.test(src), false);
   assert.equal(/process\.env\.BARQ_ADMIN_PIN/.test(src), false);
 });
+
+test("health probes Blob store (token alone is not enough)", () => {
+  const src = readFileSync("src/routes/api/health.ts", "utf8");
+  assert.match(src, /probeBlobStoreOk/);
+});

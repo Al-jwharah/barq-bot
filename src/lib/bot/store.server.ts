@@ -1205,118 +1205,585 @@ export async function expireOldClips() {
   await sql`delete from clip_links where expires_at is not null and expires_at < now()`;
 }
 
-export async function backupSnapshot() {
+export type BackupSnapshot = {
+  at: string;
+  settings: Record<string, string>;
+  codes: Array<{ code: string; days: number; max_uses: number; used_count: number; active: boolean; created_at?: string }>;
+  members: Array<{
+    tg_id: string;
+    username?: string | null;
+    role?: string;
+    tier?: string;
+    is_banned?: boolean;
+    first_name?: string | null;
+    subscribed_until?: string | null;
+    downloads_used?: number;
+  }>;
+  usage: Array<{ user_id: string; day: string; action: string; count: number }>;
+  bans: Array<{
+    id: string;
+    user_id: string;
+    reason?: string | null;
+    category?: string | null;
+    created_by?: string | null;
+    created_at?: string | null;
+    expires_at?: string | null;
+    status?: string | null;
+    appeal_status?: string | null;
+    appeal_text?: string | null;
+    updated_at?: string | null;
+  }>;
+  tickets: Array<{
+    id: string;
+    user_id: string;
+    job_id?: string | null;
+    subject?: string | null;
+    message: string;
+    status?: string | null;
+    assigned_to?: string | null;
+    error_code?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    resolved_at?: string | null;
+  }>;
+  /** Clip link metadata only — blob bytes stay in object storage. */
+  clips: Array<{
+    id: string;
+    tg_id: string;
+    url: string;
+    media_url?: string | null;
+    thumbnail?: string | null;
+    kind?: string | null;
+    platform?: string | null;
+    created_at?: string | null;
+    expires_at?: string | null;
+    storage_key?: string | null;
+    hits?: number;
+    max_hits?: number | null;
+    revoked_at?: string | null;
+  }>;
+  /** Job row metadata. Active statuses are coerced to cancelled on restore. */
+  jobs: Array<{
+    id: string;
+    tg_id: string;
+    chat_id: string;
+    url: string;
+    platform?: string | null;
+    status?: string | null;
+    attempts?: number;
+    max_attempts?: number;
+    status_message_id?: number | null;
+    error?: string | null;
+    error_code?: string | null;
+    error_message_safe?: string | null;
+    update_id?: number | null;
+    job_key?: string | null;
+    quota_applied?: boolean;
+    created_at?: string | null;
+    started_at?: string | null;
+    completed_at?: string | null;
+    failed_at?: string | null;
+    cancelled_at?: string | null;
+    expired_at?: string | null;
+    finished_at?: string | null;
+    retry_at?: string | null;
+    priority?: number;
+  }>;
+};
+
+const ACTIVE_RESTORE_JOB_STATUSES = new Set(["pending", "processing", "uploading"]);
+
+function coerceRestoredJobStatus(status: string | null | undefined): {
+  status: string;
+  cancelled_at: string | null;
+  error_code: string | null;
+  error_message_safe: string | null;
+} {
+  const s = String(status ?? "cancelled");
+  if (ACTIVE_RESTORE_JOB_STATUSES.has(s)) {
+    return {
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      error_code: "restored_from_backup",
+      error_message_safe: "active job cancelled on restore",
+    };
+  }
+  return {
+    status: s || "cancelled",
+    cancelled_at: null,
+    error_code: null,
+    error_message_safe: null,
+  };
+}
+
+export async function backupSnapshot(): Promise<BackupSnapshot> {
   const sql = await sqlClient();
   const settings = await getSettings();
   const codes = await listCodes();
-  const members = await listMembers(500);
+  const members = await sql<Record<string, unknown>>`
+    select * from members order by created_at desc
+  `.catch(() => [] as Record<string, unknown>[]);
   const usage = await sql<{ user_id: string; day: string; action: string; count: number }>`
     select user_id, day::text as day, action, count from usage_counters
   `.catch(() => []);
+  const bans = await sql<Record<string, unknown>>`
+    select id, user_id, reason, category, created_by, created_at, expires_at, status, appeal_status, appeal_text, updated_at
+    from bans
+    order by created_at desc
+  `.catch(() => [] as Record<string, unknown>[]);
+  const tickets = await sql<Record<string, unknown>>`
+    select id, user_id, job_id, subject, message, status, assigned_to, error_code, created_at, updated_at, resolved_at
+    from support_tickets
+    order by created_at desc
+  `.catch(() => [] as Record<string, unknown>[]);
+  const clips = await sql<Record<string, unknown>>`
+    select id, tg_id, url, media_url, thumbnail, kind, platform, created_at, expires_at, storage_key, hits, max_hits, revoked_at
+    from clip_links
+    order by created_at desc
+  `.catch(() => [] as Record<string, unknown>[]);
+  const jobs = await sql<Record<string, unknown>>`
+    select id, tg_id, chat_id, url, platform, status, attempts, max_attempts, status_message_id,
+           error, error_code, error_message_safe, update_id, job_key, quota_applied,
+           created_at, started_at, completed_at, failed_at, cancelled_at, expired_at, finished_at, retry_at, priority
+    from download_jobs
+    order by created_at desc
+    limit 5000
+  `.catch(() => [] as Record<string, unknown>[]);
+
   return {
     at: new Date().toISOString(),
     settings,
     codes,
-    members: members.map((m) => ({
-      tg_id: m.tg_id,
-      username: m.username,
-      role: m.role,
-      tier: m.tier,
-      is_banned: m.is_banned,
-    })),
+    members: members.map((m) => {
+      const mem = rowToMember(m);
+      return {
+        tg_id: mem.tg_id,
+        username: mem.username,
+        role: mem.role,
+        tier: mem.tier,
+        is_banned: mem.is_banned,
+        first_name: mem.first_name,
+        subscribed_until: mem.subscribed_until,
+        downloads_used: mem.downloads_used,
+      };
+    }),
     usage,
+    bans: bans.map((b) => ({
+      id: String(b.id),
+      user_id: String(b.user_id),
+      reason: b.reason != null ? String(b.reason) : null,
+      category: b.category != null ? String(b.category) : null,
+      created_by: b.created_by != null ? String(b.created_by) : null,
+      created_at: b.created_at != null ? String(b.created_at) : null,
+      expires_at: b.expires_at != null ? String(b.expires_at) : null,
+      status: b.status != null ? String(b.status) : "active",
+      appeal_status: b.appeal_status != null ? String(b.appeal_status) : null,
+      appeal_text: b.appeal_text != null ? String(b.appeal_text) : null,
+      updated_at: b.updated_at != null ? String(b.updated_at) : null,
+    })),
+    tickets: tickets.map((t) => ({
+      id: String(t.id),
+      user_id: String(t.user_id),
+      job_id: t.job_id != null ? String(t.job_id) : null,
+      subject: t.subject != null ? String(t.subject) : null,
+      message: String(t.message ?? ""),
+      status: t.status != null ? String(t.status) : "open",
+      assigned_to: t.assigned_to != null ? String(t.assigned_to) : null,
+      error_code: t.error_code != null ? String(t.error_code) : null,
+      created_at: t.created_at != null ? String(t.created_at) : null,
+      updated_at: t.updated_at != null ? String(t.updated_at) : null,
+      resolved_at: t.resolved_at != null ? String(t.resolved_at) : null,
+    })),
+    clips: clips.map((c) => ({
+      id: String(c.id),
+      tg_id: String(c.tg_id),
+      url: String(c.url ?? ""),
+      media_url: c.media_url != null ? String(c.media_url) : null,
+      thumbnail: c.thumbnail != null ? String(c.thumbnail) : null,
+      kind: c.kind != null ? String(c.kind) : null,
+      platform: c.platform != null ? String(c.platform) : null,
+      created_at: c.created_at != null ? String(c.created_at) : null,
+      expires_at: c.expires_at != null ? String(c.expires_at) : null,
+      storage_key: c.storage_key != null ? String(c.storage_key) : null,
+      hits: Number(c.hits ?? 0),
+      max_hits: c.max_hits != null ? Number(c.max_hits) : null,
+      revoked_at: c.revoked_at != null ? String(c.revoked_at) : null,
+    })),
+    jobs: jobs.map((j) => ({
+      id: String(j.id),
+      tg_id: String(j.tg_id),
+      chat_id: String(j.chat_id),
+      url: String(j.url ?? ""),
+      platform: j.platform != null ? String(j.platform) : null,
+      status: j.status != null ? String(j.status) : null,
+      attempts: Number(j.attempts ?? 0),
+      max_attempts: Number(j.max_attempts ?? 3),
+      status_message_id: j.status_message_id != null ? Number(j.status_message_id) : null,
+      error: j.error != null ? String(j.error) : null,
+      error_code: j.error_code != null ? String(j.error_code) : null,
+      error_message_safe: j.error_message_safe != null ? String(j.error_message_safe) : null,
+      update_id: j.update_id != null ? Number(j.update_id) : null,
+      job_key: j.job_key != null ? String(j.job_key) : null,
+      quota_applied: Boolean(j.quota_applied),
+      created_at: j.created_at != null ? String(j.created_at) : null,
+      started_at: j.started_at != null ? String(j.started_at) : null,
+      completed_at: j.completed_at != null ? String(j.completed_at) : null,
+      failed_at: j.failed_at != null ? String(j.failed_at) : null,
+      cancelled_at: j.cancelled_at != null ? String(j.cancelled_at) : null,
+      expired_at: j.expired_at != null ? String(j.expired_at) : null,
+      finished_at: j.finished_at != null ? String(j.finished_at) : null,
+      retry_at: j.retry_at != null ? String(j.retry_at) : null,
+      priority: Number(j.priority ?? 0),
+    })),
   };
 }
 
-export async function restoreBackup(snap: {
-  settings?: Record<string, string>;
-  codes?: Array<{ code: string; days: number; max_uses: number; used_count: number; active: boolean }>;
-  members?: Array<{ tg_id: string; username?: string | null; role?: string; tier?: string; is_banned?: boolean }>;
-  usage?: Array<{ user_id: string; day: string; action: string; count: number }>;
-}) {
+export type RestoreBackupInput = Partial<Omit<BackupSnapshot, "at">> & { at?: string };
+
+export async function restoreBackup(snap: RestoreBackupInput) {
   const { withTransaction } = await import("@/lib/db");
-  return withTransaction(async (sql) => {
-    if (snap.settings) {
-      for (const [key, value] of Object.entries(snap.settings)) {
-        await sql`
-          insert into bot_settings (key, value) values (${key}, ${value})
-          on conflict (key) do update set value = excluded.value
-        `;
-      }
+  return withTransaction(async (sql) => applyRestoreSnapshot(sql, snap));
+}
+
+/** Upsert-only restore. Never truncates. Active jobs coerced to cancelled. */
+export async function applyRestoreSnapshot(
+  sql: {
+    (strings: TemplateStringsArray, ...values: unknown[]): Promise<unknown>;
+  },
+  snap: RestoreBackupInput,
+) {
+  let codes = 0;
+  let bans = 0;
+  let tickets = 0;
+  let clips = 0;
+  let jobs = 0;
+
+  if (snap.settings) {
+    for (const [key, value] of Object.entries(snap.settings)) {
+      await sql`
+        insert into bot_settings (key, value) values (${key}, ${value})
+        on conflict (key) do update set value = excluded.value
+      `;
     }
-    if (snap.members) {
-      for (const m of snap.members) {
-        await sql`
-          insert into members (tg_id, username, role, tier, is_banned)
-          values (${m.tg_id}, ${m.username ?? null}, ${m.role ?? "user"}, ${m.tier ?? "free"}, ${Boolean(m.is_banned)})
-          on conflict (tg_id) do update set
-            username = coalesce(excluded.username, members.username),
-            role = excluded.role,
-            tier = excluded.tier,
-            is_banned = excluded.is_banned
-        `;
-      }
+  }
+  if (snap.members) {
+    for (const m of snap.members) {
+      await sql`
+        insert into members (tg_id, username, role, tier, is_banned, first_name, subscribed_until, downloads_used)
+        values (
+          ${m.tg_id},
+          ${m.username ?? null},
+          ${m.role ?? "user"},
+          ${m.tier ?? "free"},
+          ${Boolean(m.is_banned)},
+          ${m.first_name ?? null},
+          ${m.subscribed_until ?? null},
+          ${Number(m.downloads_used ?? 0)}
+        )
+        on conflict (tg_id) do update set
+          username = coalesce(excluded.username, members.username),
+          role = excluded.role,
+          tier = excluded.tier,
+          is_banned = excluded.is_banned,
+          first_name = coalesce(excluded.first_name, members.first_name),
+          subscribed_until = coalesce(excluded.subscribed_until, members.subscribed_until),
+          downloads_used = greatest(members.downloads_used, excluded.downloads_used)
+      `;
     }
-    if (snap.usage) {
-      for (const u of snap.usage) {
-        await sql`
-          insert into usage_counters (user_id, day, action, count)
-          values (${u.user_id}, ${u.day}::date, ${u.action}, ${u.count})
-          on conflict (user_id, day, action) do update set count = excluded.count
-        `;
-      }
+  }
+  if (snap.codes) {
+    for (const c of snap.codes) {
+      const code = String(c.code).trim().toUpperCase();
+      if (!code) continue;
+      await sql`
+        insert into promo_codes (code, days, max_uses, used_count, active)
+        values (
+          ${code},
+          ${Number(c.days) || 30},
+          ${Number(c.max_uses) || 20},
+          ${Number(c.used_count) || 0},
+          ${Boolean(c.active)}
+        )
+        on conflict (code) do update set
+          days = excluded.days,
+          max_uses = excluded.max_uses,
+          used_count = excluded.used_count,
+          active = excluded.active
+      `;
+      codes += 1;
     }
-    return { ok: true, members: snap.members?.length ?? 0, usage: snap.usage?.length ?? 0 };
-  });
+  }
+  if (snap.usage) {
+    for (const u of snap.usage) {
+      await sql`
+        insert into usage_counters (user_id, day, action, count)
+        values (${u.user_id}, ${u.day}::date, ${u.action}, ${u.count})
+        on conflict (user_id, day, action) do update set count = excluded.count
+      `;
+    }
+  }
+  if (snap.bans) {
+    for (const b of snap.bans) {
+      if (!b.id || !b.user_id) continue;
+      await sql`
+        insert into bans (id, user_id, reason, category, created_by, created_at, expires_at, status, appeal_status, appeal_text, updated_at)
+        values (
+          ${b.id},
+          ${b.user_id},
+          ${b.reason ?? null},
+          ${b.category ?? null},
+          ${b.created_by ?? null},
+          coalesce(${b.created_at}::timestamptz, now()),
+          ${b.expires_at ?? null},
+          ${b.status ?? "active"},
+          ${b.appeal_status ?? null},
+          ${b.appeal_text ?? null},
+          ${b.updated_at ?? null}
+        )
+        on conflict (id) do update set
+          reason = excluded.reason,
+          category = excluded.category,
+          status = excluded.status,
+          appeal_status = excluded.appeal_status,
+          appeal_text = excluded.appeal_text,
+          expires_at = excluded.expires_at,
+          updated_at = excluded.updated_at
+      `;
+      bans += 1;
+    }
+  }
+  if (snap.tickets) {
+    for (const t of snap.tickets) {
+      if (!t.id || !t.user_id) continue;
+      await sql`
+        insert into support_tickets (id, user_id, job_id, subject, message, status, assigned_to, error_code, created_at, updated_at, resolved_at)
+        values (
+          ${t.id},
+          ${t.user_id},
+          ${t.job_id ?? null},
+          ${t.subject ?? null},
+          ${t.message ?? ""},
+          ${t.status ?? "open"},
+          ${t.assigned_to ?? null},
+          ${t.error_code ?? null},
+          coalesce(${t.created_at}::timestamptz, now()),
+          coalesce(${t.updated_at}::timestamptz, now()),
+          ${t.resolved_at ?? null}
+        )
+        on conflict (id) do update set
+          subject = excluded.subject,
+          message = excluded.message,
+          status = excluded.status,
+          assigned_to = excluded.assigned_to,
+          error_code = excluded.error_code,
+          updated_at = excluded.updated_at,
+          resolved_at = excluded.resolved_at
+      `;
+      tickets += 1;
+    }
+  }
+  if (snap.clips) {
+    for (const c of snap.clips) {
+      if (!c.id || !c.tg_id) continue;
+      await sql`
+        insert into clip_links (id, tg_id, url, media_url, thumbnail, kind, platform, created_at, expires_at, storage_key, hits, max_hits, revoked_at)
+        values (
+          ${c.id},
+          ${c.tg_id},
+          ${c.url ?? ""},
+          ${c.media_url ?? null},
+          ${c.thumbnail ?? null},
+          ${c.kind ?? null},
+          ${c.platform ?? null},
+          coalesce(${c.created_at}::timestamptz, now()),
+          ${c.expires_at ?? null},
+          ${c.storage_key ?? null},
+          ${Number(c.hits ?? 0)},
+          ${c.max_hits ?? null},
+          ${c.revoked_at ?? null}
+        )
+        on conflict (id) do update set
+          url = excluded.url,
+          media_url = excluded.media_url,
+          thumbnail = excluded.thumbnail,
+          kind = excluded.kind,
+          platform = excluded.platform,
+          expires_at = excluded.expires_at,
+          storage_key = excluded.storage_key,
+          hits = excluded.hits,
+          max_hits = excluded.max_hits,
+          revoked_at = excluded.revoked_at
+      `;
+      clips += 1;
+    }
+  }
+  if (snap.jobs) {
+    for (const j of snap.jobs) {
+      if (!j.id || !j.tg_id || !j.chat_id) continue;
+      const coerced = coerceRestoredJobStatus(j.status);
+      const cancelledAt = coerced.cancelled_at ?? j.cancelled_at ?? null;
+      const errorCode = coerced.error_code ?? j.error_code ?? null;
+      const errorSafe = coerced.error_message_safe ?? j.error_message_safe ?? null;
+      await sql`
+        insert into download_jobs (
+          id, tg_id, chat_id, url, platform, status, attempts, max_attempts, status_message_id,
+          error, error_code, error_message_safe, update_id, job_key, quota_applied,
+          created_at, started_at, completed_at, failed_at, cancelled_at, expired_at, finished_at, retry_at, priority,
+          worker_id, last_heartbeat_at
+        )
+        values (
+          ${j.id},
+          ${j.tg_id},
+          ${j.chat_id},
+          ${j.url ?? ""},
+          ${j.platform ?? null},
+          ${coerced.status},
+          ${Number(j.attempts ?? 0)},
+          ${Number(j.max_attempts ?? 3)},
+          ${j.status_message_id ?? null},
+          ${j.error ?? null},
+          ${errorCode},
+          ${errorSafe},
+          ${null},
+          ${j.job_key ?? null},
+          ${Boolean(j.quota_applied)},
+          coalesce(${j.created_at}::timestamptz, now()),
+          ${j.started_at ?? null},
+          ${j.completed_at ?? null},
+          ${j.failed_at ?? null},
+          ${cancelledAt},
+          ${j.expired_at ?? null},
+          ${j.finished_at ?? null},
+          ${null},
+          ${Number(j.priority ?? 0)},
+          ${null},
+          ${null}
+        )
+        on conflict (id) do update set
+          status = excluded.status,
+          attempts = excluded.attempts,
+          error = excluded.error,
+          error_code = excluded.error_code,
+          error_message_safe = excluded.error_message_safe,
+          completed_at = excluded.completed_at,
+          failed_at = excluded.failed_at,
+          cancelled_at = excluded.cancelled_at,
+          expired_at = excluded.expired_at,
+          finished_at = excluded.finished_at,
+          retry_at = excluded.retry_at,
+          worker_id = null,
+          last_heartbeat_at = null,
+          priority = excluded.priority
+      `;
+      jobs += 1;
+    }
+  }
+
+  return {
+    ok: true as const,
+    members: snap.members?.length ?? 0,
+    usage: snap.usage?.length ?? 0,
+    codes,
+    bans,
+    tickets,
+    clips,
+    jobs,
+  };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function snapshotShape(snap: unknown): {
+function arrayLen(v: unknown, itemOk: (row: unknown) => boolean): { ok: boolean; n: number } {
+  if (v === undefined) return { ok: true, n: 0 };
+  if (!Array.isArray(v)) return { ok: false, n: 0 };
+  if (v.some((row) => !itemOk(row))) return { ok: false, n: 0 };
+  return { ok: true, n: v.length };
+}
+
+export function snapshotShape(snap: unknown): {
   ok: boolean;
   errors: string[];
   settings: number;
   codes: number;
   members: number;
   usage: number;
+  bans: number;
+  tickets: number;
+  clips: number;
+  jobs: number;
 } {
   const errors: string[] = [];
   if (!isRecord(snap)) {
-    return { ok: false, errors: ["snapshot"], settings: 0, codes: 0, members: 0, usage: 0 };
+    return {
+      ok: false,
+      errors: ["snapshot"],
+      settings: 0,
+      codes: 0,
+      members: 0,
+      usage: 0,
+      bans: 0,
+      tickets: 0,
+      clips: 0,
+      jobs: 0,
+    };
   }
   let settings = 0;
-  let codes = 0;
-  let members = 0;
-  let usage = 0;
   if (snap.settings !== undefined) {
     if (!isRecord(snap.settings) || Object.values(snap.settings).some((v) => typeof v !== "string")) {
       errors.push("settings");
     } else settings = Object.keys(snap.settings).length;
   }
-  if (snap.codes !== undefined) {
-    if (!Array.isArray(snap.codes) || snap.codes.some((c) => !isRecord(c) || typeof c.code !== "string")) {
-      errors.push("codes");
-    } else codes = snap.codes.length;
-  }
-  if (snap.members !== undefined) {
-    if (
-      !Array.isArray(snap.members) ||
-      snap.members.some((m) => !isRecord(m) || (typeof m.tg_id !== "string" && typeof m.tg_id !== "number"))
-    ) {
-      errors.push("members");
-    } else members = snap.members.length;
-  }
-  if (snap.usage !== undefined) {
-    if (
-      !Array.isArray(snap.usage) ||
-      snap.usage.some((u) => !isRecord(u) || typeof u.user_id !== "string" || typeof u.action !== "string")
-    ) {
-      errors.push("usage");
-    } else usage = snap.usage.length;
-  }
-  return { ok: errors.length === 0, errors, settings, codes, members, usage };
+  const codes = arrayLen(snap.codes, (c) => isRecord(c) && typeof c.code === "string");
+  if (!codes.ok) errors.push("codes");
+  const members = arrayLen(
+    snap.members,
+    (m) => isRecord(m) && (typeof m.tg_id === "string" || typeof m.tg_id === "number"),
+  );
+  if (!members.ok) errors.push("members");
+  const usage = arrayLen(
+    snap.usage,
+    (u) => isRecord(u) && typeof u.user_id === "string" && typeof u.action === "string",
+  );
+  if (!usage.ok) errors.push("usage");
+  const bans = arrayLen(
+    snap.bans,
+    (b) => isRecord(b) && typeof b.id === "string" && typeof b.user_id === "string",
+  );
+  if (!bans.ok) errors.push("bans");
+  const tickets = arrayLen(
+    snap.tickets,
+    (t) => isRecord(t) && typeof t.id === "string" && typeof t.user_id === "string",
+  );
+  if (!tickets.ok) errors.push("tickets");
+  const clips = arrayLen(
+    snap.clips,
+    (c) => isRecord(c) && typeof c.id === "string" && typeof c.tg_id === "string",
+  );
+  if (!clips.ok) errors.push("clips");
+  const jobs = arrayLen(
+    snap.jobs,
+    (j) =>
+      isRecord(j) &&
+      typeof j.id === "string" &&
+      typeof j.tg_id === "string" &&
+      typeof j.chat_id === "string",
+  );
+  if (!jobs.ok) errors.push("jobs");
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    settings,
+    codes: codes.n,
+    members: members.n,
+    usage: usage.n,
+    bans: bans.n,
+    tickets: tickets.n,
+    clips: clips.n,
+    jobs: jobs.n,
+  };
 }
 
 /** Dry-run: validate snapshot shape. Does not write rows. Never logs snapshot contents. */
@@ -1326,7 +1793,7 @@ export async function restoreTest(snap: unknown) {
   await logEvent({
     action: "restore_test_completed",
     status: shape.ok ? "ok" : "error",
-    detail: `settings=${shape.settings} codes=${shape.codes} members=${shape.members} usage=${shape.usage}`,
+    detail: `settings=${shape.settings} codes=${shape.codes} members=${shape.members} usage=${shape.usage} bans=${shape.bans} tickets=${shape.tickets} clips=${shape.clips} jobs=${shape.jobs}`,
   });
   return { ...shape, applied: false as const };
 }
