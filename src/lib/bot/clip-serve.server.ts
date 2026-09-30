@@ -44,6 +44,30 @@ async function streamBlob(key: string, request: Request, access: "public" | "pri
   return new Response(result.stream, { status: range ? 206 : 200, headers: out });
 }
 
+const MIME_BY_EXT: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  mkv: "video/x-matroska",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  pdf: "application/pdf",
+  zip: "application/zip",
+};
+
+export function mimeFromPath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return MIME_BY_EXT[ext] ?? "application/octet-stream";
+}
+
 async function streamTelegramFile(fileId: string, request: Request): Promise<Response> {
   if (!TELEGRAM_BOT_TOKEN) return clipNotFoundResponse();
   try {
@@ -56,7 +80,13 @@ async function streamTelegramFile(fileId: string, request: Request): Promise<Res
     });
     if (!res.ok && res.status !== 206) return clipNotFoundResponse();
     const out = new Headers();
-    out.set("Content-Type", res.headers.get("content-type") || "application/octet-stream");
+    const upstream = res.headers.get("content-type") || "";
+    const guessed = mimeFromPath(file.file_path);
+    out.set("Content-Type", upstream && upstream !== "application/octet-stream" ? upstream : guessed);
+    const name = file.file_path.split("/").pop()?.replace(/[^\w.-]+/g, "_") || "file";
+    const inline = /^(video|image|audio)\//.test(out.get("Content-Type") || "");
+    out.set("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="barq-${name}"`);
+    out.set("Accept-Ranges", "bytes");
     out.set("Cache-Control", "private, max-age=60");
     out.set("X-Content-Type-Options", "nosniff");
     const cl = res.headers.get("content-length");

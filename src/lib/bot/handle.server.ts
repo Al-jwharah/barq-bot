@@ -285,6 +285,8 @@ async function downloadBlob(url: string, maxBytes = TELEGRAM_MAX_UPLOAD): Promis
   try {
     const res = await fetch(url, { headers: mediaHeaders(undefined, url), signal: ctrl.signal });
     if (!res.ok) throw new Error(`تعذر تنزيل الملف (${res.status})`);
+    // A player/watch page is not a media file — never upload HTML as a "video".
+    if (/^text\/|html|json/i.test(res.headers.get("content-type") || "")) throw new Error("NOT_MEDIA_FILE");
     const len = Number(res.headers.get("content-length") || 0);
     if (len > maxBytes) throw new Error(ERROR_MESSAGES.FILE_TOO_LARGE);
     const buf = await res.arrayBuffer();
@@ -546,6 +548,64 @@ export async function deliver(chatId: number, result: ExtractResult, stamp = fal
       throw new Error("الملف أكبر من حد تليجرام (حوالي 50 ميغا). أرسل رابط مقطع أقصر.");
     }
     first = false;
+  }
+  return ids;
+}
+
+/**
+ * Deliver files produced by the universal pipeline (any site). Parts of a split
+ * video go out in order; only the first carries the caption and buttons.
+ */
+export async function deliverLocalMedia(
+  chatId: number,
+  result: ExtractResult,
+  media: {
+    kind: "video" | "audio";
+    parts: Array<{ path: string; size: number }>;
+    duration?: number;
+    width?: number;
+    height?: number;
+  },
+): Promise<number[]> {
+  const { readFile } = await import("node:fs/promises");
+  const ids: number[] = [];
+  const total = media.parts.length;
+  const markup = await clipMarkup(chatId, result.sourceUrl, media.kind);
+  for (let i = 0; i < total; i += 1) {
+    const part = media.parts[i]!;
+    if (part.size > TELEGRAM_MAX_UPLOAD) throw new Error(ERROR_MESSAGES.FILE_TOO_LARGE);
+    await telegram.sendChatAction(chatId, media.kind === "audio" ? "upload_voice" : "upload_video").catch(() => undefined);
+    const bytes = await readFile(part.path);
+    const ext = part.path.split(".").pop() || (media.kind === "audio" ? "m4a" : "mp4");
+    const blob = new Blob([bytes], { type: media.kind === "audio" ? "audio/mp4" : "video/mp4" });
+    const extra: Record<string, string> = {};
+    const label = total > 1 ? `الجزء ${i + 1}/${total}` : "";
+    if (i === 0) {
+      const cap = signatureCaption(media.kind, result.platform, result.sourceUrl);
+      extra.caption = [label, cap].filter(Boolean).join("\n");
+      extra.reply_markup = JSON.stringify(markup);
+    } else if (label) {
+      extra.caption = label;
+    }
+    if (total === 1 && media.kind === "video") {
+      if (media.width) extra.width = String(media.width);
+      if (media.height) extra.height = String(media.height);
+      if (media.duration) extra.duration = String(Math.round(media.duration));
+    }
+    const name = `barq-${(result.id ?? "media").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40) || "media"}${total > 1 ? `-${i + 1}` : ""}.${ext}`;
+    if (media.kind === "audio") {
+      const sent = await sendAudioFile(chatId, blob, name, extra);
+      if (sent?.message_id) ids.push(sent.message_id);
+      continue;
+    }
+    const sent = await sendVideoFile(chatId, blob, name, extra);
+    if (sent?.message_id) ids.push(sent.message_id);
+    if (total === 1 && sent?.file_id) {
+      const { saveTelegramFile } = await import("./file-cache.server");
+      const { rememberDeliveredFile } = await import("./file-actions.server");
+      rememberDeliveredFile(chatId, sent.file_id);
+      await saveTelegramFile(result.sourceUrl, sent.file_id, "video").catch(() => undefined);
+    }
   }
   return ids;
 }
@@ -1540,9 +1600,10 @@ async function handleCallback(cb: TgCallbackQuery) {
     await telegram.sendMessage(targetChat, "أُلغي الرابط المؤقت. التحميل كما هو: الصق الرابط.");
     return;
   }
-  if (data === "drop:12" || data === "drop:24") {
+  const dropPick = /^drop:(12|24)(?::([a-f0-9]{10}))?$/.exec(data);
+  if (dropPick) {
     await telegram.answerCallback(cb.id);
-    await finishDropLink(targetChat, fromId, data === "drop:12" ? 12 : 24);
+    await finishDropLink(targetChat, fromId, dropPick[1] === "12" ? 12 : 24, dropPick[2]);
     return;
   }
   if (data.startsWith("cd:")) {
@@ -1721,11 +1782,14 @@ async function offerDropHours(chatId: number, fromId: number, msg: TgMessage): P
   if (!file) return false;
   stashDrop(fromId, file);
   setAwait(fromId, "host_ttl");
+  const { saveDropPick } = await import("./library.server");
+  const pickId = await saveDropPick(fromId, chatId, file).catch(() => "");
+  const tag = pickId ? `:${pickId}` : "";
   await telegram.sendMessage(chatId, dropPickText(file.kind), {
     reply_markup: inlineKeyboard([
       [
-        { text: "12 ساعة", callback_data: "drop:12" },
-        { text: "24 ساعة", callback_data: "drop:24" },
+        { text: "12 ساعة", callback_data: `drop:12${tag}` },
+        { text: "24 ساعة", callback_data: `drop:24${tag}` },
       ],
       [{ text: "إلغاء", callback_data: "drop:no" }],
     ]),
@@ -1733,10 +1797,15 @@ async function offerDropHours(chatId: number, fromId: number, msg: TgMessage): P
   return true;
 }
 
-async function finishDropLink(chatId: number, fromId: number, hours: 12 | 24) {
+async function finishDropLink(chatId: number, fromId: number, hours: 12 | 24, pickId?: string) {
   const { takeDrop, dropReadyText } = await import("./drop.server");
   const { hostTelegramFile } = await import("./host.server");
-  const file = takeDrop(fromId);
+  let file = takeDrop(fromId);
+  if (pickId) {
+    const { takeDropPick } = await import("./library.server");
+    const stored = await takeDropPick(pickId, fromId).catch(() => null);
+    file = stored ?? file;
+  }
   clearAwait(fromId);
   if (!file) {
     await telegram.sendMessage(chatId, "الملف انتهت مهلته. اضغط «رابط مؤقت» وأرسله مرة ثانية.");
@@ -2803,7 +2872,10 @@ async function handleMessage(msg: TgMessage, updateId?: number) {
     const mediaOnly =
       !text &&
       Boolean(msg.sticker || msg.animation || msg.photo || msg.video || msg.voice || msg.video_note || msg.audio);
-    if (mediaOnly && peekAwait(fromId) !== "hostfile") {
+    if (mediaOnly && peekAwait(fromId) !== "hostfile" && peekAwait(fromId) !== "host_ttl") {
+      // The "send file" step may have been handled by another serverless instance:
+      // a bare file always gets the 12h/24h temporary-link choice.
+      if (await offerDropHours(chatId, fromId, msg).catch(() => false)) return;
       await telegram.sendMessage(chatId, "الصق رابط المقطع.", {
         reply_markup: await keysFor(fromId, member),
       });

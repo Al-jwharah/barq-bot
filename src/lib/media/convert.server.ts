@@ -21,7 +21,7 @@ function bundledFfmpeg(): string | null {
   return null;
 }
 
-async function ensureFfmpeg(): Promise<string> {
+export async function ensureFfmpeg(): Promise<string> {
   if (existsSync(FFMPEG)) return FFMPEG;
   const bundled = bundledFfmpeg();
   if (bundled) return bundled;

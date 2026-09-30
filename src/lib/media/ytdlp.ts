@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { chmod, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -35,28 +35,61 @@ function ytdlpOnPath(): string | null {
   return null;
 }
 
+/**
+ * Pinned "onedir" build: unpacked once per instance into tmp. The single-file
+ * build re-extracts ~90 MB into /tmp on EVERY run, which fills Vercel's shared
+ * 512 MB /tmp when jobs run concurrently.
+ */
+const YTDLP_ZIP_URL = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux.zip";
+const YTDLP_DIR = join(tmpdir(), "barq-ytdlp-dir");
+const YTDLP_DIR_BIN = join(YTDLP_DIR, "yt-dlp_linux");
+
+async function installOnedir(): Promise<string> {
+  const res = await fetch(YTDLP_ZIP_URL, { signal: AbortSignal.timeout(50_000) });
+  if (!res.ok) throw new Error("تعذر تجهيز أداة التحميل");
+  const zip = Buffer.from(await res.arrayBuffer());
+  const staging = `${YTDLP_DIR}.${randomBytes(4).toString("hex")}`;
+  const { extractZip } = await import("./unzip.server");
+  await extractZip(zip, staging);
+  const bin = join(staging, "yt-dlp_linux");
+  if (!existsSync(bin)) throw new Error("تعذر تجهيز أداة التحميل");
+  await chmod(bin, 0o755);
+  try {
+    await rename(staging, YTDLP_DIR);
+  } catch {
+    // Another request won the race; use theirs.
+    await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+  }
+  return YTDLP_DIR_BIN;
+}
+
+async function installOnefile(): Promise<string> {
+  const res = await fetch(YTDLP_URL, { signal: AbortSignal.timeout(50_000) });
+  if (!res.ok) throw new Error("تعذر تجهيز أداة التحميل");
+  const bin = Buffer.from(await res.arrayBuffer());
+  if (bin.length < 1_000_000 || bin.subarray(0, 4).toString("latin1") !== "\u007fELF") {
+    throw new Error("تعذر تجهيز أداة التحميل");
+  }
+  const part = `${YTDLP_CACHED}.part`;
+  await writeFile(part, bin);
+  await chmod(part, 0o755);
+  await rename(part, YTDLP_CACHED);
+  return YTDLP_CACHED;
+}
+
 /** Resolve a fixed yt-dlp binary. Downloads the pinned release into tmp when the image has none. */
 export function ensureYtDlp(): Promise<string> {
   const found = ytdlpOnPath();
   if (found) return Promise.resolve(found);
+  if (existsSync(YTDLP_DIR_BIN)) return Promise.resolve(YTDLP_DIR_BIN);
   if (existsSync(YTDLP_CACHED)) return Promise.resolve(YTDLP_CACHED);
   if (!ytdlpReady) {
-    ytdlpReady = (async () => {
-      const res = await fetch(YTDLP_URL, { signal: AbortSignal.timeout(50_000) });
-      if (!res.ok) throw new Error("تعذر تجهيز أداة التحميل");
-      const bin = Buffer.from(await res.arrayBuffer());
-      if (bin.length < 1_000_000 || bin.subarray(0, 4).toString("latin1") !== "\u007fELF") {
-        throw new Error("تعذر تجهيز أداة التحميل");
-      }
-      const part = `${YTDLP_CACHED}.part`;
-      await writeFile(part, bin);
-      await chmod(part, 0o755);
-      await rename(part, YTDLP_CACHED);
-      return YTDLP_CACHED;
-    })().catch((err) => {
-      ytdlpReady = null;
-      throw err;
-    });
+    ytdlpReady = installOnedir()
+      .catch(() => installOnefile())
+      .catch((err) => {
+        ytdlpReady = null;
+        throw err;
+      });
   }
   return ytdlpReady;
 }
@@ -197,6 +230,34 @@ export function sanitizeYtDlpExtraArgs(extraArgs: string[]): string[] {
   return out;
 }
 
+let cookiesPath: string | null | undefined;
+
+/**
+ * Optional owner-provided network settings for sites that block cloud IPs:
+ * YTDLP_PROXY (http/socks proxy URL) and YTDLP_COOKIES_B64 (Netscape cookies.txt, base64).
+ * Never logged. Empty when unset, so default behaviour is unchanged.
+ */
+export function ytDlpNetworkArgs(): string[] {
+  const out: string[] = [];
+  const proxy = process.env.YTDLP_PROXY?.trim();
+  if (proxy && /^(https?|socks5h?):\/\//i.test(proxy)) out.push("--proxy", proxy);
+  if (cookiesPath === undefined) {
+    cookiesPath = null;
+    const b64 = process.env.YTDLP_COOKIES_B64?.trim();
+    if (b64) {
+      try {
+        const p = join(tmpdir(), `barq-cookies-${randomBytes(4).toString("hex")}.txt`);
+        writeFileSync(p, Buffer.from(b64, "base64"), { mode: 0o600 });
+        cookiesPath = p;
+      } catch {
+        cookiesPath = null;
+      }
+    }
+  }
+  if (cookiesPath) out.push("--cookies", cookiesPath);
+  return out;
+}
+
 export function buildYtDlpArgs(opts: {
   url: string;
   outputPath: string;
@@ -230,6 +291,7 @@ export function buildYtDlpArgs(opts: {
     "-o",
     opts.outputPath,
     ...extra,
+    ...ytDlpNetworkArgs(),
     "--",
     url,
   ];
