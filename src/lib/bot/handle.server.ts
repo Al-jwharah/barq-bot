@@ -713,6 +713,7 @@ export async function sendQualityPicker(
   fromId: number,
   result: ExtractResult,
   stamp: boolean,
+  voice = false,
 ): Promise<boolean> {
   const item =
     result.items.find((i) => i.kind === "video" || i.kind === "gif" || i.kind === "audio") ??
@@ -737,6 +738,7 @@ export async function sendQualityPicker(
     { text: "أفضل متاح ⚡️", callback_data: `q:${pickId}:best` },
     { text: "صوت فقط 🎵", callback_data: `q:${pickId}:mp3` },
   ]);
+  if (voice) rows.push([{ text: "رسالة صوتية 🎙", callback_data: `q:${pickId}:voice` }]);
 
   const title = (result.title || result.text || "").trim().slice(0, 80);
   const head = title ? `اختر الجودة\n${title}` : "اختر الجودة أو صوت فقط";
@@ -767,7 +769,8 @@ export async function fulfillQualityPick(chatId: number, fromId: number, pickId:
       const blob = await blobToVoice(await downloadBlob(audio?.url || variant.url));
       await sendVoiceFile(chatId, blob, `barq-${result.id ?? "v"}.ogg`);
     } catch {
-      await telegram.sendMessage(chatId, "تعذر تحويل المقطع لرسالة صوتية. جرّب «صوت فقط».");
+      await telegram.sendMessage(chatId, "تعذر تحويل المقطع لرسالة صوتية. أعد إرسال الرابط واختر «صوت فقط».");
+      return;
     }
   } else if (choice === "mp3") {
     try {
@@ -1916,7 +1919,7 @@ async function enqueueMessageUrls(
   const { hasPremium } = await import("./plans.server");
   const batchOn = await featureOn("batch").catch(() => true);
   const cap = !batchOn ? 1 : hasPremium(member, fromId) ? 5 : MULTI_LINK_CAP;
-  const { batch, total } = selectDownloadUrls(batchOn ? urls : urls.slice(0, 1), cap);
+  const { batch, total } = selectDownloadUrls(urls, cap);
   if (!batch.length) return;
   const { multiLinkProgressText } = await import("./engagement");
   let statusMsgId: number | undefined;

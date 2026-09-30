@@ -107,6 +107,7 @@ export const telegram = {
           "pre_checkout_query",
           "my_chat_member",
           "channel_post",
+          "inline_query",
         ],
       },
       timeout * 1000 + 8000,

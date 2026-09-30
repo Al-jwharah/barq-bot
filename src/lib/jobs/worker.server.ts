@@ -202,7 +202,7 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   if (live?.status === "cancelled") throw new Error("cancelled");
 
   const picked = QUALITY_PICKER
-    ? await sendQualityPicker(chatId, fromId, result, stamp).catch(() => false)
+    ? await sendQualityPicker(chatId, fromId, result, stamp, AUDIO_OFFER).catch(() => false)
     : false;
   if (picked) {
     if (await applyJobQuota(job.id)) {

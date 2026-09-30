@@ -61,10 +61,16 @@ export async function maybeSendOwnerReport(now = Date.now()): Promise<boolean> {
   const flag = await featureOn("owner_report");
   const last = Number((await store.getSettings())["owner_report_at"] ?? 0);
   if (!reportDue(flag, last, now)) return false;
+  // Claim first (no double send from overlapping crons); release the claim if sending fails.
   await store.setSetting("owner_report_at", String(now));
-  const { riyadhDay } = await import("./clock");
-  const text = reportText(await dailyNumbers(), riyadhDay(now));
-  const { telegram } = await import("./telegram.server");
-  await telegram.sendMessage(Number(OWNER_TG_ID), text);
-  return true;
+  try {
+    const { riyadhDay } = await import("./clock");
+    const text = reportText(await dailyNumbers(), riyadhDay(now));
+    const { telegram } = await import("./telegram.server");
+    await telegram.sendMessage(Number(OWNER_TG_ID), text);
+    return true;
+  } catch (err) {
+    await store.setSetting("owner_report_at", String(last || 0)).catch(() => undefined);
+    throw err;
+  }
 }

@@ -40,7 +40,13 @@ export async function handleInlineQuery(q: TgInlineQuery): Promise<void> {
     return;
   }
   const { getMember } = await import("./store.server");
-  const member = await getMember(q.from.id).catch(() => null);
+  let member: Awaited<ReturnType<typeof getMember>> | null;
+  try {
+    member = await getMember(q.from.id);
+  } catch {
+    await answer([]);
+    return;
+  }
   if (member?.is_banned) {
     await answer([]);
     return;
