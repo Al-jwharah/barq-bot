@@ -64,7 +64,8 @@ export const Route = createFileRoute("/api/health")({
         const ready = dbOk && secrets.telegram && secrets.webhookSecret;
         const checks = {
           database: (dbOk ? "ok" : "down") as OkDown,
-          storage: (storageOk ? "ok" : "down") as OkDown,
+          // "fallback": Blob is unavailable but temp links are served from Telegram file_ids.
+          storage: (storageOk ? "ok" : telegramCheck === "ok" ? "fallback" : "down") as OkDown | "fallback",
           queue: queueCheck,
           worker: workerCheck,
           telegram: telegramCheck,
@@ -77,7 +78,7 @@ export const Route = createFileRoute("/api/health")({
           queueCheck !== "ok" ||
           telegramCheck !== "ok" ||
           !webhookOk ||
-          !storageOk;
+          (!storageOk && telegramCheck !== "ok");
 
         let status: HealthStatus;
         if (!dbOk) status = "down";

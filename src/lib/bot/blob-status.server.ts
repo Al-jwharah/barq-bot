@@ -19,7 +19,25 @@ export function blobTokenPresent(): boolean {
  * True only if token exists AND a put/del probe succeeds.
  * Suspended stores can still list() — put() is definitive.
  */
+const PROBE_TTL_MS = 10 * 60 * 1000;
+let probeCache: { ok: boolean; at: number } | null = null;
+
+export function clearBlobProbeCacheForTests(): void {
+  probeCache = null;
+}
+
+/**
+ * Cached per instance for 10 minutes: every put/del counts against the Blob
+ * plan's operation quota, and /api/health is polled often.
+ */
 export async function probeBlobStoreOk(): Promise<boolean> {
+  if (probeCache && Date.now() - probeCache.at < PROBE_TTL_MS) return probeCache.ok;
+  const ok = await probeBlobStoreUncached();
+  probeCache = { ok, at: Date.now() };
+  return ok;
+}
+
+async function probeBlobStoreUncached(): Promise<boolean> {
   const token = typeof process !== "undefined" ? process.env.BLOB_READ_WRITE_TOKEN?.trim() : "";
   if (!token) return false;
   try {

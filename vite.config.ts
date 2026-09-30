@@ -181,7 +181,7 @@ export default defineConfig(({ command, isPreview }) => ({
             experimental: { wasm: true },
             vercel: {
               functions: {
-                maxDuration: 120,
+                maxDuration: 300,
                 memory: 1024,
               },
             },

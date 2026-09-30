@@ -1190,3 +1190,35 @@ export async function askOwnerGrok(text: string, fromId: number | string): Promi
     inFlight.delete(flightKey);
   }
 }
+
+const PICK_MEDIA_SYSTEM = `You pick the main video of a web page from a numbered list of URLs found in its HTML.
+Return JSON only: {"index": <number or -1>}
+Prefer, in order: a direct video file (.mp4/.webm/.mov), an HLS/DASH manifest (.m3u8/.mpd), a video player/embed page URL for the main video.
+Ignore ads, trackers, analytics, thumbnails, fonts, scripts, social share links, and navigation links.
+If none of the URLs is the page's main video, return {"index": -1}.`;
+
+/**
+ * AI fallback for unknown sites: choose the media URL out of URLs that really
+ * exist in the page. The model can never invent a URL (index into our list only).
+ */
+export async function grokPickMediaUrl(pageUrl: string, title: string | undefined, pool: string[]): Promise<string | null> {
+  if (!aiEnabled() || !grokReady() || pool.length === 0) return null;
+  const list = pool.slice(0, 150).map((u, i) => `${i}: ${u.slice(0, 300)}`).join("\n");
+  try {
+    const out = await chat({
+      messages: [
+        { role: "system", content: PICK_MEDIA_SYSTEM },
+        { role: "user", content: clipAiInput(`page: ${pageUrl}\ntitle: ${title ?? ""}\nurls:\n${list}`, 24000) },
+      ],
+      maxTokens: 40,
+      temperature: 0,
+      json: true,
+    });
+    const m = out.content.match(/"index"\s*:\s*(-?\d+)/);
+    const idx = m ? Number(m[1]) : -1;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= pool.length) return null;
+    return pool[idx] ?? null;
+  } catch {
+    return null;
+  }
+}

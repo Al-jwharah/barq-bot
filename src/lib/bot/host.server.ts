@@ -2,7 +2,9 @@ import { randomBytes } from "node:crypto";
 import { TELEGRAM_BOT_TOKEN } from "./config.server";
 import {
   BLOB_SUSPENDED_AR,
+  isBlobMarkedSuspended,
   isBlobStoreUnavailable,
+  markBlobSuspended,
   tgFileStorageKey,
 } from "./blob-status.server";
 import { createClipLink } from "./store.server";
@@ -115,7 +117,8 @@ export async function hostTelegramFile(input: {
   let storageKey: string | null = null;
   let backend: "blob" | "telegram" = "telegram";
 
-  if (process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
+  // Skip Blob entirely once this instance saw the store suspended (saves a full re-download).
+  if (process.env.BLOB_READ_WRITE_TOKEN?.trim() && !isBlobMarkedSuspended()) {
     try {
       storageKey = await putHostBlob({
         fileId: input.fileId,
@@ -126,12 +129,11 @@ export async function hostTelegramFile(input: {
       });
       backend = "blob";
     } catch (err) {
-      if (!isBlobStoreUnavailable(err)) {
-        // Non-billing errors (download failed, etc.) still surface
-        const msg = err instanceof Error ? err.message : "";
-        if (msg && !/no blob token/i.test(msg)) throw err instanceof Error ? err : new Error(String(err));
-      }
+      // Any Blob failure (suspended, quota, network) falls back to the Telegram
+      // file_id link, which streams from Telegram on each open.
+      if (isBlobStoreUnavailable(err)) markBlobSuspended();
       console.warn("[host] Blob unavailable — using Telegram file_id fallback");
+      storageKey = null;
     }
   }
 

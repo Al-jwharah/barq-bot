@@ -251,3 +251,43 @@ export function pickToResult(payload: PickPayload): ExtractResult {
 }
 
 export const MONTHLY_LIMIT = MONTHLY_CAP;
+
+type DropPickFile = { fileId: string; kind: "video" | "photo" | "file" | "app"; fileName?: string; mime?: string };
+
+/**
+ * Persist a file waiting for its 12h/24h choice. Serverless instances do not
+ * share memory, so the button press may land on a different instance.
+ */
+export async function saveDropPick(tgId: number, chatId: number, file: DropPickFile): Promise<string> {
+  const sql = await getSql();
+  await ensure(sql);
+  const id = newPickId();
+  await sql`
+    insert into media_picks (id, tg_id, chat_id, payload)
+    values (${id}, ${String(tgId)}, ${chatId}, ${JSON.stringify({ drop: true, ...file })})
+  `;
+  return id;
+}
+
+export async function takeDropPick(id: string, tgId: number): Promise<DropPickFile | null> {
+  if (!/^[a-f0-9]{10}$/.test(id)) return null;
+  const sql = await getSql();
+  await ensure(sql);
+  const rows = await sql<{ payload: Record<string, unknown>; created_at: string | Date }>`
+    delete from media_picks where id = ${id} and tg_id = ${String(tgId)}
+    returning payload, created_at
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  const at = row.created_at instanceof Date ? row.created_at.getTime() : Date.parse(String(row.created_at));
+  if (!Number.isFinite(at) || Date.now() - at > PICK_TTL_MS) return null;
+  const p = typeof row.payload === "string" ? (JSON.parse(row.payload) as Record<string, unknown>) : row.payload;
+  if (!p || p.drop !== true || typeof p.fileId !== "string") return null;
+  const kind = p.kind === "video" || p.kind === "photo" || p.kind === "app" ? p.kind : "file";
+  return {
+    fileId: p.fileId,
+    kind,
+    fileName: typeof p.fileName === "string" ? p.fileName : undefined,
+    mime: typeof p.mime === "string" ? p.mime : undefined,
+  };
+}

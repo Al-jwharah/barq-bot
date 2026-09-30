@@ -1,7 +1,7 @@
 import { waitUntil } from "@vercel/functions";
 import { extractMedia } from "../media/extract";
 import type { ExtractResult } from "../media/types";
-import { extractWithYtdlp, ensureYtDlp } from "../media/ytdlp";
+import { ensureYtDlp } from "../media/ytdlp";
 import { SUPPORT_URL } from "../bot/config.server";
 import {
   assertSafeMedia,
@@ -174,7 +174,13 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   let result = await cachedExtract(job.url).catch(() => null);
   const cachedMedia = result?.items?.[0]?.url || "";
   if (!result || /tiktokcdn|tiktokv\.com|byteicdn|tikcdn\.io/i.test(cachedMedia)) {
-    result = await extractMedia(job.url);
+    try {
+      result = await extractMedia(job.url);
+    } catch (extractErr) {
+      const { isFinalExtractError } = await import("../media/universal.server");
+      if (isFinalExtractError(extractErr)) throw extractErr;
+      return runUniversal(job, extractErr);
+    }
   }
   result = forceTikTokFile(result);
   await saveExtractCache(job.url, result).catch(() => undefined);
@@ -223,10 +229,9 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
     ids = await deliver(chatId, result, false, fromId);
   } catch (sendErr) {
     if (sendErr instanceof MediaBlockedError) throw sendErr;
-    if (result.items.length) throw sendErr;
-    result = await extractWithYtdlp(job.url, result.platform);
-    await assertSafeMedia(job.url, result);
-    ids = await deliver(chatId, result, false, fromId);
+    // Direct-URL delivery failed (HLS/DASH only, CDN refuses Telegram, oversize…):
+    // download the real file on the server and upload it, splitting if needed.
+    return runUniversal(job, sendErr);
   }
   const { archiveDelivered } = await import("../bot/vault.server");
   const media = result.items.find((i) => i.kind === "video" || i.kind === "gif") || result.items[0];
@@ -257,6 +262,90 @@ async function runOnce(job: DownloadJob): Promise<"ok"> {
   if (mid) await telegram.deleteMessage(chatId, mid).catch(() => undefined);
   await sendAfterDownload(chatId, fromId);
   return "ok";
+}
+
+/**
+ * Universal fallback for any site: yt-dlp → page standards → Grok pick → upload
+ * the file (split into parts when over Telegram's cap). Keeps every guard:
+ * SSRF, porn/music policy (assertSafeMedia on page + each media target), quota.
+ */
+async function runUniversal(job: DownloadJob, cause: unknown): Promise<"ok"> {
+  const chatId = Number(job.chat_id);
+  const fromId = Number(job.tg_id);
+  const mid = job.status_message_id;
+  const { universalDownload, universalUserError } = await import("../media/universal.server");
+  const { progressStatus } = await import("../bot/product.server");
+  const { assertPreExtractBlocklist } = await import("../bot/safety");
+  assertPreExtractBlocklist(job.url);
+  await editStatus(chatId, mid, progressStatus("extract"));
+  const started = Date.now();
+  const budget = Math.max(30_000, jobTimeoutMs() - 60_000);
+  let dl: Awaited<ReturnType<typeof universalDownload>>;
+  try {
+    dl = await universalDownload(job.url, {
+      deadline: started + budget,
+      guard: async (target) => {
+        assertPreExtractBlocklist(target);
+        await assertSafeMedia(job.url, {
+          platform: "generic",
+          sourceUrl: job.url,
+          items: [{ kind: "video", url: target, variants: [] }],
+        });
+      },
+    });
+  } catch (err) {
+    if (err instanceof MediaBlockedError) throw err;
+    await logEvent({
+      requestId: requestId(),
+      tgId: fromId,
+      action: "universal",
+      status: "failed",
+      durationMs: Date.now() - started,
+      detail: `${err instanceof Error ? err.message : "failed"} after ${cause instanceof Error ? cause.message.slice(0, 60) : "extract"} ${String((err as { detail?: string })?.detail ?? "").slice(0, 100)}`.trim(),
+    }).catch(() => undefined);
+    throw universalUserError(err);
+  }
+  try {
+    const result: ExtractResult = {
+      platform: (dl.extractor || "generic").toLowerCase().split(":")[0]!,
+      title: dl.title,
+      text: dl.title,
+      sourceUrl: job.url,
+      items: [{ kind: dl.kind, url: dl.mediaUrl, thumbnail: dl.thumbnail, duration: dl.duration, variants: [] }],
+    };
+    // Policy check again with the real title/uploader metadata.
+    await assertSafeMedia(job.url, result);
+    const live = await getJob(job.id);
+    if (live?.status === "cancelled") throw new Error("cancelled");
+    await markJobUploading(job.id).catch(() => undefined);
+    await editStatus(chatId, mid, progressStatus("upload", dl.parts.length > 1 ? `${dl.parts.length} أجزاء` : undefined));
+    const { deliverLocalMedia } = await import("../bot/handle.server");
+    const ids = await deliverLocalMedia(chatId, result, dl);
+    const { archiveDelivered } = await import("../bot/vault.server");
+    const { getMember } = await import("../bot/store.server");
+    const person = await getMember(fromId).catch(() => null);
+    await archiveDelivered({
+      fromChatId: chatId,
+      messageIds: ids,
+      sourceUrl: job.url,
+      mediaUrl: dl.mediaUrl,
+      kind: dl.kind,
+      who: { id: fromId, name: person?.first_name, username: person?.username },
+    }).catch(() => undefined);
+    if (await applyJobQuota(job.id)) {
+      await bumpDownload(fromId);
+      const { bumpDownloadOk } = await import("../bot/growth.server");
+      await bumpDownloadOk(fromId, chatId).catch(() => undefined);
+      emit("download.completed", { tgId: fromId, url: job.url });
+    }
+    await logDownload({ tgId: fromId, url: job.url, platform: `u:${result.platform}:${dl.via}`, ok: true, title: dl.title });
+    markProcessed();
+    if (mid) await telegram.deleteMessage(chatId, mid).catch(() => undefined);
+    await sendAfterDownload(chatId, fromId);
+    return "ok";
+  } finally {
+    await dl.cleanup();
+  }
 }
 
 export async function processDownloadJob(id?: string): Promise<{ id?: string; status: string }> {
